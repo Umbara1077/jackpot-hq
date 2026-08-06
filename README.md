@@ -23,8 +23,33 @@ Your NJ Lottery tracker & number lab. Built Aug 5, 2026.
 | `functions/api/auth/[action].js` | Sign in with Google / Apple (OAuth) |
 | `functions/api/sync.js` | Cross-device sync blob for signed-in users (KV) |
 | `functions/_session.js` | Shared signed-cookie session helpers |
+| `worker/index.js` + `wrangler.jsonc` | Makes Cloudflare run the API (see “Why variables were blocked”) |
 | `scripts/fetch-live.mjs` + `.github/workflows/refresh.yml` | Hourly cloud data refresh (`live.json`) |
 | `DESIGN.md` | Design doc: games, odds, features, architecture |
+
+## Why variables were blocked (read this before adding env vars)
+
+Cloudflare deployed this repo as a **Worker with static assets**, not a Pages project. In that
+mode the `functions/` folder is never executed — so `/api/*` returned 404 (no AI picks, no
+sign-in) and the dashboard refused env vars: *“Variables cannot be added to a Worker that only
+has static assets.”*
+
+`wrangler.jsonc` + `worker/index.js` fix that: the Worker now has real code that routes `/api/*`
+to the same handlers in `functions/` and serves everything else as static files. Once deployed,
+**Settings → Variables and secrets** accepts values. Two things to check in the dashboard:
+
+- **Worker name** must match `"name"` in `wrangler.jsonc` (currently `jackpot-hq`), or
+  `wrangler deploy` publishes to a *different* Worker and your URL keeps serving the old build.
+- **Deploy command** (Settings → Build) should be plain `npx wrangler deploy` — a leftover
+  `--assets=.` flag can fight the config.
+
+Add API keys as **Secrets**, not plaintext variables: `wrangler deploy` replaces plaintext vars
+declared in config but preserves secrets. Same reason the KV binding for sync must be declared
+in `wrangler.jsonc` rather than added in the dashboard.
+
+Note: the tracked file `api/ai-pick` is a static test fixture that reports every model as
+available. It sits at the same path as the real endpoint; `run_worker_first` in `wrangler.jsonc`
+keeps the Worker ahead of it, but deleting it would remove the trap entirely.
 
 ## AI Picks (Claude · GPT · Grok · Gemini 3.x)
 

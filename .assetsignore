@@ -1,0 +1,15 @@
+# Files in the repo that should NOT be uploaded as public static assets.
+# (Same syntax as .gitignore. The app is bundled into index.html, so sources aren't needed.)
+**/.git
+**/node_modules
+**/.DS_Store
+.assetsignore
+wrangler.jsonc
+worker
+functions
+src
+scripts
+.github
+.claude
+*.md
+*.cmd

@@ -1,0 +1,24 @@
+{
+  // Deploys Jackpot HQ as a Worker that serves the static app AND runs the API.
+  //
+  // Without `main`, Cloudflare treats this repo as static-assets-only: the API 404s and
+  // the dashboard refuses env vars ("Variables cannot be added to a Worker that only has
+  // static assets"). `worker/index.js` routes /api/* to the handlers in `functions/`.
+  //
+  // NOTE: `name` must match the Worker in your Cloudflare dashboard, or `wrangler deploy`
+  // will publish to a different Worker and your URL will keep serving the old build.
+  "name": "jackpot-hq",
+  "main": "worker/index.js",
+  "compatibility_date": "2025-11-01",
+  "assets": {
+    "directory": ".",
+    "binding": "ASSETS",
+    // /api/* must reach the Worker even if a file of that name ever exists
+    "run_worker_first": ["/api/*"]
+  },
+  "observability": { "enabled": true }
+
+  // Cross-device sync (optional): create a KV namespace, then uncomment and paste its ID.
+  // Declaring it here is required — `wrangler deploy` replaces dashboard-added bindings.
+  // "kv_namespaces": [{ "binding": "USERS", "id": "PASTE_KV_NAMESPACE_ID" }]
+}
