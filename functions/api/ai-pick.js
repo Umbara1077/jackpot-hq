@@ -11,6 +11,7 @@
 // Honest by design: no model can raise the odds of winning. The prompt asks for
 // statistically-typical, low-crowd-share lines with reasoning — the same real edge
 // the app's Smart Pick has, plus an actual explanation.
+import { verifySession } from '../_session.js';
 
 const MODELS = {
   fable: { provider: 'anthropic', id: 'claude-fable-5', name: 'Claude Fable 5' },
@@ -57,7 +58,9 @@ export async function onRequestGet(context) {
 export async function onRequestPost(context) {
   const { request, env } = context;
   if (env.APP_PASSCODE && request.headers.get('x-app-pass') !== env.APP_PASSCODE) {
-    return json({ error: 'passcode' }, 401);
+    // signed-in users skip the passcode
+    const user = await verifySession(request.headers.get('cookie'), env.SESSION_SECRET);
+    if (!user) return json({ error: 'passcode' }, 401);
   }
 
   let body;

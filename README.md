@@ -20,27 +20,60 @@ Your NJ Lottery tracker & number lab. Built Aug 5, 2026.
 | `src/seeds.js` | Embedded real draw history (NJ-only games) |
 | `src/build.js` | Bundles everything into one portable file + the artifact variant |
 | `functions/api/ai-pick.js` | Cloudflare Pages Function that answers AI Pick requests |
+| `functions/api/auth/[action].js` | Sign in with Google / Apple (OAuth) |
+| `functions/api/sync.js` | Cross-device sync blob for signed-in users (KV) |
+| `functions/_session.js` | Shared signed-cookie session helpers |
 | `scripts/fetch-live.mjs` + `.github/workflows/refresh.yml` | Hourly cloud data refresh (`live.json`) |
 | `DESIGN.md` | Design doc: games, odds, features, architecture |
 
 ## AI Picks (Fable 5 · Opus 5 · Grok 4.5 · GPT-5.6)
 
-The Lab's **AI Pick** strategy sends the game rules + recent real draws to a model of your
-choice and returns picks with per-line reasoning. It runs through `functions/api/ai-pick.js`
-on Cloudflare so API keys never touch the browser.
-
-Setup (Cloudflare Pages → your project → **Settings → Environment variables**, then redeploy):
-
-| Variable | Unlocks |
-|---|---|
-| `ANTHROPIC_API_KEY` | Claude Fable 5 + Claude Opus 5 (console.anthropic.com) |
-| `OPENAI_API_KEY` | GPT-5.6 Sol + Terra (platform.openai.com) |
-| `XAI_API_KEY` | Grok 4.5 (console.x.ai) |
-| `APP_PASSCODE` | Optional but recommended — a passcode the app asks for once, so strangers who find your URL can't spend your API credits |
-
+The Lab's featured **AI Pick** card sends the game rules + recent real draws to the model you
+choose (each shows its maker's mark in the picker) and returns picks with per-line reasoning.
+It runs through `functions/api/ai-pick.js` on Cloudflare so API keys never touch the browser.
 The app auto-detects which models are configured. Honest fine print: no AI improves the odds —
 they build statistically-typical, low-crowd-share lines and explain them. Cost per pick request
 is roughly $0.01–0.05 (Grok/Terra/Opus) up to ~$0.10 (Fable 5).
+
+## Sign in with Google (+ optional Apple) & cross-device sync
+
+Sign-in lives in `functions/api/auth/[action].js` (sessions are signed HttpOnly cookies — no
+database needed). Signed-in users skip the AI passcode, and with the KV binding below their
+tickets/budget/settings follow them between phone and PC via `functions/api/sync.js`.
+
+One-time Google setup (~5 minutes, free):
+
+1. Go to https://console.cloud.google.com → create (or pick) a project.
+2. **APIs & Services → OAuth consent screen** → External → fill in the app name + your email.
+   The app only uses basic scopes (openid/email/profile), so no Google verification is needed.
+3. **APIs & Services → Credentials → Create credentials → OAuth client ID** → *Web application*:
+   - Authorized redirect URI: `https://YOUR-SITE.pages.dev/api/auth/google-cb`
+     (add one per domain if you also use a custom domain)
+4. Copy the **Client ID** and **Client secret** into the env vars below.
+
+Sync storage (optional): Cloudflare dashboard → **Workers & Pages → KV → Create namespace**
+(any name), then your Pages project → **Settings → Bindings → Add → KV namespace** with
+variable name `USERS`. Without it, sign-in still works — data just stays per-device.
+
+Apple sign-in also ships (`APPLE_*` vars below) but needs a paid Apple Developer membership —
+skip it unless you already have one.
+
+## Cloudflare env vars — the full checklist
+
+Cloudflare Pages → your project → **Settings → Environment variables** (Production), then
+**redeploy** (env changes only apply to new deployments):
+
+| Variable | Unlocks | Where it comes from |
+|---|---|---|
+| `ANTHROPIC_API_KEY` | Claude Fable 5 + Claude Opus 5 | console.anthropic.com → API keys |
+| `OPENAI_API_KEY` | GPT-5.6 Sol + Terra | platform.openai.com → API keys |
+| `XAI_API_KEY` | Grok 4.5 | console.x.ai |
+| `APP_PASSCODE` | Recommended — passcode the app asks for once, so strangers who find your URL can't spend your API credits (signed-in users skip it) | any string you choose |
+| `SESSION_SECRET` | Required for any sign-in — signs the login cookies | any long random string, e.g. `node -e "console.log(require('crypto').randomBytes(48).toString('base64url'))"` |
+| `GOOGLE_CLIENT_ID` + `GOOGLE_CLIENT_SECRET` | Sign in with Google | Google Cloud Console (steps above) |
+| `APPLE_CLIENT_ID`, `APPLE_TEAM_ID`, `APPLE_KEY_ID`, `APPLE_PRIVATE_KEY` | Sign in with Apple (optional) | developer.apple.com (Services ID + .p8 key) |
+
+Plus the KV binding `USERS` (Settings → Bindings) if you want cross-device sync.
 
 ## Live data on this PC
 

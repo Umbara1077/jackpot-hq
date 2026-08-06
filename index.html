@@ -246,6 +246,56 @@ button.obtn.gold{color:var(--gold); border-color:color-mix(in srgb, var(--gold) 
 .strat p{margin:5px 0 0; font-size:11px; color:var(--ink3); line-height:1.45}
 .strat.on{border-color:var(--gold-deep); background:linear-gradient(180deg, rgba(232,184,75,.14), var(--card)); box-shadow:0 6px 20px var(--gold-glow)}
 .strat .ico{width:17px;height:17px;color:var(--gold)}
+/* featured AI Pick card — the star of the Lab */
+.aifeature{
+  display:block; width:100%; text-align:left; font:inherit; cursor:pointer; color:var(--ink);
+  position:relative; overflow:hidden; border-radius:17px; padding:16px 17px 15px; margin:2px 0 12px;
+  border:1px solid color-mix(in srgb, var(--gold) 48%, transparent);
+  background:
+    radial-gradient(120% 150% at 100% -30%, var(--gold-glow), transparent 60%),
+    linear-gradient(135deg, color-mix(in srgb, var(--gold) 15%, transparent), var(--card) 55%);
+  box-shadow:var(--shadow); transition:border-color .18s, box-shadow .18s, transform .12s;
+}
+.aifeature:active{transform:scale(.985)}
+.aifeature::after{
+  content:""; position:absolute; top:0; bottom:0; width:55%; left:-70%; pointer-events:none;
+  background:linear-gradient(100deg, transparent, color-mix(in srgb, var(--gold-hi) 14%, transparent) 50%, transparent);
+  transform:skewX(-18deg); animation:aisweep 4.6s ease-in-out infinite;
+}
+@keyframes aisweep{0%,55%{left:-70%} 90%,100%{left:130%}}
+.aifeature.on{border-color:var(--gold); box-shadow:0 0 0 1px var(--gold-deep), 0 10px 34px var(--gold-glow)}
+.af-head{display:flex; align-items:center; gap:9px}
+.af-head b{font-family:var(--display); font-size:20px; letter-spacing:.02em}
+.af-spark{font-size:18px; filter:drop-shadow(0 0 9px var(--gold-glow))}
+.af-tag{
+  margin-left:auto; font-size:9.5px; font-weight:800; letter-spacing:.14em; text-transform:uppercase;
+  color:var(--gold); border:1px solid color-mix(in srgb, var(--gold) 50%, transparent);
+  border-radius:99px; padding:4px 10px; background:color-mix(in srgb, var(--gold) 10%, transparent);
+}
+.aifeature p{margin:7px 0 0; font-size:12.5px; color:var(--ink2); line-height:1.5; max-width:56ch}
+.af-makers{display:flex; align-items:center; gap:6px; margin-top:12px; flex-wrap:wrap}
+.af-makers .ailogo{display:block}
+.af-makers .ailogo svg{width:24px; height:24px; display:block; border-radius:7px; box-shadow:0 2px 6px rgba(0,0,0,.35)}
+.af-makers > span{font-size:11px; color:var(--ink3); font-weight:600; margin-left:3px}
+.sublabel{font-size:11px; letter-spacing:.15em; text-transform:uppercase; color:var(--ink3); font-weight:700; margin:16px 2px 8px}
+#aimodels{display:grid; grid-template-columns:repeat(auto-fill,minmax(215px,1fr)); gap:9px; margin-top:2px}
+.aimodel{
+  display:flex; align-items:center; gap:11px; font:inherit; text-align:left; cursor:pointer; color:var(--ink);
+  background:var(--card); border:1px solid var(--card-edge); border-radius:14px; padding:10px 12px; transition:all .15s;
+}
+.aimodel:disabled{opacity:.4; cursor:default}
+.aimodel.on{border-color:var(--gold-deep); box-shadow:0 0 0 1px var(--gold-deep), 0 6px 18px var(--gold-glow); transform:translateY(-1px)}
+.aimodel .ailogo svg{width:38px; height:38px; display:block; border-radius:10px; box-shadow:0 3px 8px rgba(0,0,0,.35)}
+.aimodel .aimeta{display:flex; flex-direction:column; line-height:1.25}
+.aimodel .aimeta b{font-size:13.5px}
+.aimodel .aimeta small{font-size:10.5px; color:var(--ink3); letter-spacing:.04em}
+.authbtn{
+  display:flex; align-items:center; justify-content:center; gap:10px; width:100%; font:inherit; font-weight:700; font-size:14.5px;
+  border-radius:13px; padding:13px; cursor:pointer; margin-top:10px; border:1px solid transparent; transition:transform .12s;
+}
+.authbtn:active{transform:scale(.97)}
+.authbtn.google{background:#fff; color:#1f1f1f; border-color:#dadce0}
+.authbtn.apple{background:#000; color:#fff; border-color:#333}
 #labctl{display:flex; align-items:center; gap:12px; margin:14px 0}
 .stepper{display:flex; align-items:center; gap:2px; background:var(--card); border:1px solid var(--card-edge); border-radius:12px; padding:3px}
 .stepper button{width:34px; height:34px; border:0; background:transparent; color:var(--gold); font-size:20px; font-weight:700; cursor:pointer; border-radius:9px}
@@ -432,14 +482,21 @@ details.rt p{color:var(--ink2); font-size:13px; margin:9px 0 2px; line-height:1.
   /* lab: strategies left, generated lines right */
   #view-lab.on{display:grid; grid-template-columns:minmax(320px,410px) minmax(0,1fr); gap:0 26px; align-items:start}
   #view-lab.on > h2.sect, #view-lab.on > .gpick{grid-column:1/-1}
-  #view-lab.on > .stratgrid{grid-column:1; grid-row:3}
-  #view-lab.on > #truthchip{grid-column:1; grid-row:4}
-  #view-lab.on > #labctl{grid-column:1; grid-row:5}
+  #view-lab.on > .aifeature{grid-column:1; grid-row:3}
+  #view-lab.on > .stratgrid{grid-column:1; grid-row:4}
+  #view-lab.on > #truthchip{grid-column:1; grid-row:5}
+  #view-lab.on > #labctl{grid-column:1; grid-row:6}
   #view-lab.on > .card{grid-column:2; grid-row:3 / span 30}
   #view-lab.on > .card:has(#popgen){grid-column:1/-1; grid-row:auto / span 1}
   #view-lab.on > #machine{grid-column:2; grid-row:3}
   #view-lab.on > #labout{grid-column:2; grid-row:4 / span 30}
   #view-lab.on .stratgrid{grid-template-columns:1fr 1fr}
+  /* lab in AI mode: models + generate stack under the featured card, other strategies drop below */
+  #view-lab.on.aimode > #aipanel{grid-column:1; grid-row:4}
+  #view-lab.on.aimode > #truthchip{grid-row:5}
+  #view-lab.on.aimode > #labctl{grid-row:6}
+  #view-lab.on.aimode > .sublabel{grid-column:1; grid-row:7}
+  #view-lab.on.aimode > .stratgrid{grid-row:8}
   /* tickets: two columns of cards */
   #view-tickets.on{display:grid; grid-template-columns:1fr 1fr; gap:0 16px; align-items:start}
   #view-tickets.on > h2.sect, #view-tickets.on > .tfilter, #view-tickets.on > .footnote, #view-tickets.on > .card:not(.ticket){grid-column:1/-1}
@@ -470,6 +527,9 @@ details.rt p{color:var(--ink2); font-size:13px; margin:9px 0 2px; line-height:1.
       <h1>Jackpot <em>HQ</em></h1>
       <span class="nj">New&nbsp;Jersey</span>
     </div>
+    <button class="hbtn" id="btn-acct" title="Account" aria-label="Account">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="8" r="4"/><path d="M4 21c1.5-3.6 4.5-5.4 8-5.4s6.5 1.8 8 5.4"/></svg>
+    </button>
     <button class="hbtn" id="btn-sync" title="Update results" aria-label="Update results">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M21 12a9 9 0 1 1-2.64-6.36M21 3v6h-6"/></svg>
     </button>
@@ -774,7 +834,7 @@ catch { S = { ...DEFAULTS }; }
 S.budget = Object.assign({}, DEFAULTS.budget, S.budget);
 S.alerts = Object.assign({}, DEFAULTS.alerts, S.alerts);
 let saveT;
-function save() { clearTimeout(saveT); saveT = setTimeout(() => { try { localStorage.setItem('jhq', JSON.stringify(S)); } catch {} }, 120); }
+function save() { clearTimeout(saveT); saveT = setTimeout(() => { try { localStorage.setItem('jhq', JSON.stringify(S)); } catch {} try { syncPushSoon(); } catch {} }, 120); }
 
 /* results store: seed + fetched/manual merged, ascending by date */
 const RES = {};
@@ -947,8 +1007,123 @@ const STRATS = {
     },
   },
   manual: { name: 'My Numbers', ico: '✍️', truth: 'Pick your own — the Lab grades the crowd-factor as you tap.', desc: 'Tap the board to build your line and get instant analysis.', manual: true },
-  ai: { name: 'AI Pick', ico: '🤖', truth: 'No AI can beat randomness — these models build smart low-crowd lines from the real draw history and explain their thinking.', desc: 'Fable 5, Opus 5, Grok 4.5 or GPT-5.6 reasons over the real draw data and explains each pick.', ai: true },
+  ai: { name: 'AI Pick', ico: '✨', truth: 'No AI can beat randomness — these models build smart low-crowd lines from the real draw history and explain their thinking.', desc: 'Claude Fable 5, Opus 5, Grok 4.5 or GPT-5.6 reasons over the real draw data and explains every pick it makes.', ai: true },
 };
+
+/* maker logo marks, drawn as SVG so each model is identifiable at a glance
+   (Claude spark for Anthropic, blossom knot for OpenAI, X mark for xAI) */
+function aiLogo(key) {
+  const spark = (bg) => `<svg viewBox="0 0 40 40"><rect width="40" height="40" rx="10" fill="${bg}"/><g fill="#fdf6ee">${Array.from({ length: 12 }, (_, i) =>
+    `<path d="M20 20 L18.7 9.6 Q20 7.1 21.3 9.6 Z" transform="rotate(${i * 30} 20 20)"/>`).join('')}</g></svg>`;
+  const blossom = (fg) => `<svg viewBox="0 0 40 40"><rect width="40" height="40" rx="10" fill="#0a0a0a"/><g fill="none" stroke="${fg}" stroke-width="2.4">${Array.from({ length: 6 }, (_, i) =>
+    `<rect x="16.5" y="4.8" width="7" height="18.8" rx="3.5" transform="rotate(${i * 60} 20 20)"/>`).join('')}</g></svg>`;
+  const M = {
+    fable: spark('#d97757'),
+    opus: spark('#b85c3f'),
+    grok: `<svg viewBox="0 0 40 40"><rect width="40" height="40" rx="10" fill="#0a0a0a"/><path transform="translate(8 8)" fill="#fff" d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>`,
+    sol: blossom('#fff'),
+    terra: blossom('#7fd4a8'),
+  };
+  return `<span class="ailogo">${M[key] || M.fable}</span>`;
+}
+const AI_MAKER = { fable: 'Anthropic', opus: 'Anthropic', grok: 'xAI', sol: 'OpenAI', terra: 'OpenAI' };
+
+/* ============================================================
+   ACCOUNT + CROSS-DEVICE SYNC — /api/auth/* and /api/sync
+   Sign in with Google/Apple; tickets, budget & settings follow you.
+   ============================================================ */
+let ACCT = { checked: false, user: null, providers: {}, sync: false, lastPush: 0 };
+let syncT = null;
+const onWeb = () => location.protocol !== 'file:' && !(typeof window !== 'undefined' && window.claude);
+async function authProbe() {
+  if (!onWeb()) { ACCT.checked = true; return; }
+  try {
+    const r = await fetch('api/auth/me', { cache: 'no-store' });
+    const j = await r.json();
+    ACCT = { checked: true, user: j.user, providers: j.providers || {}, sync: !!j.sync, lastPush: 0 };
+    if (ACCT.user && ACCT.sync) await syncPull();
+  } catch { ACCT.checked = true; }
+  paintAcctBtn();
+}
+function paintAcctBtn() {
+  const b = $('#btn-acct'); if (!b) return;
+  b.classList.toggle('attn', !!ACCT.user);
+  b.title = ACCT.user ? (ACCT.user.email || ACCT.user.name || 'Signed in') : 'Sign in';
+}
+function syncPayload() {
+  return { tickets: S.tickets, budget: S.budget, jackpots: S.jackpots, alerts: S.alerts, theme: S.theme, aiPass: S.aiPass || '', aiEndpoint: S.aiEndpoint || '', pushedAt: Date.now() };
+}
+function mergeRemote(remote) {
+  if (!remote) return false;
+  let changed = false;
+  // tickets: union by id (never lose a ticket from either device)
+  const byId = new Map((S.tickets || []).map(t => [t.id, t]));
+  for (const t of remote.tickets || []) if (t && t.id && !byId.has(t.id)) { byId.set(t.id, t); changed = true; }
+  S.tickets = [...byId.values()].sort((a, b) => (b.created || '').localeCompare(a.created || '') || String(b.id).localeCompare(String(a.id)));
+  // quick-log entries: union
+  const seen = new Set((S.budget.manual || []).map(m => JSON.stringify(m)));
+  for (const m of remote.budget?.manual || []) { const k = JSON.stringify(m); if (!seen.has(k)) { S.budget.manual.push(m); seen.add(k); changed = true; } }
+  // manual jackpot edits: newest timestamp wins per game
+  for (const [g, j] of Object.entries(remote.jackpots || {})) {
+    if (!S.jackpots[g] || (j.ts || 0) > (S.jackpots[g].ts || 0)) { S.jackpots[g] = j; changed = true; }
+  }
+  // scalar settings: whoever pushed most recently wins
+  if ((remote.pushedAt || 0) > (S.syncedAt || 0)) {
+    if (remote.budget && typeof remote.budget.limit === 'number') S.budget.limit = remote.budget.limit;
+    if (remote.alerts) S.alerts = Object.assign({}, S.alerts, remote.alerts);
+    if (remote.theme) S.theme = remote.theme;
+    if (remote.aiPass) S.aiPass = remote.aiPass;
+    if (remote.aiEndpoint) S.aiEndpoint = remote.aiEndpoint;
+    changed = true;
+  }
+  S.syncedAt = Math.max(S.syncedAt || 0, remote.pushedAt || 0);
+  return changed;
+}
+async function syncPull() {
+  try {
+    const r = await fetch('api/sync', { cache: 'no-store' });
+    if (!r.ok) return;
+    const j = await r.json();
+    if (j.state && mergeRemote(j.state)) { save(); applyTheme(); refreshCurrentView(); }
+  } catch { }
+}
+function syncPushSoon() {
+  if (!onWeb() || !ACCT.user || !ACCT.sync) return;
+  clearTimeout(syncT);
+  syncT = setTimeout(async () => {
+    try {
+      const payload = syncPayload();
+      const r = await fetch('api/sync', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(payload) });
+      if (r.ok) { ACCT.lastPush = Date.now(); S.syncedAt = payload.pushedAt; }
+    } catch { }
+  }, 2500);
+}
+function openAccount() {
+  if (!onWeb()) {
+    return openSheet(`<h3>👤 Account</h3><p class="muted small">Sign-in and cross-device sync work on the website version — open your deployed site and sign in there. This copy keeps everything saved locally.</p>`);
+  }
+  if (ACCT.user) {
+    openSheet(`<h3>👤 ${esc(ACCT.user.name || ACCT.user.email || 'Signed in')}</h3>
+      <p class="muted small">${esc(ACCT.user.email || '')} · via ${esc(ACCT.user.provider)}</p>
+      <div class="card" style="margin-top:12px"><b>${ACCT.sync ? '🔄 Sync is on' : 'Sync not set up'}</b>
+        <p class="muted small" style="margin:5px 0 0">${ACCT.sync
+          ? 'Tickets, budget and settings sync to this account — sign in on your phone and PC to share them.' + (ACCT.lastPush ? ' Last push: just now.' : '')
+          : 'To enable: Cloudflare → Workers & Pages → KV → create a namespace, then bind it to this project as <b>USERS</b> (Settings → Bindings) and redeploy.'}</p>
+        ${ACCT.sync ? '<div class="rowflex" style="margin-top:10px"><button class="obtn gold" id="syncNow">Sync now</button></div>' : ''}
+      </div>
+      <div style="margin-top:14px"><button class="obtn" id="signOut" style="width:100%">Sign out</button></div>`);
+    const sn = $('#syncNow'); if (sn) sn.onclick = async () => { await syncPull(); syncPushSoon(); toast('Synced', true); };
+    $('#signOut').onclick = () => { location.href = 'api/auth/logout'; };
+    return;
+  }
+  const g = ACCT.providers.google, a = ACCT.providers.apple;
+  openSheet(`<h3>👤 Sign in</h3>
+    <p class="muted small">Sign in once and your tickets, budget and settings follow you between phone and PC${AI.passReq ? ' — and AI picks stop asking for the passcode' : ''}.</p>
+    ${g ? `<button class="authbtn google" onclick="location.href='api/auth/google'"><svg viewBox="0 0 24 24" width="18" height="18"><path fill="#4285F4" d="M23.5 12.3c0-.8-.1-1.6-.2-2.3H12v4.5h6.4a5.5 5.5 0 0 1-2.4 3.6v3h3.9c2.3-2.1 3.6-5.2 3.6-8.8z"/><path fill="#34A853" d="M12 24c3.2 0 6-1.1 8-2.9l-3.9-3a7.2 7.2 0 0 1-10.8-3.8H1.2v3.1A12 12 0 0 0 12 24z"/><path fill="#FBBC05" d="M5.3 14.3a7.2 7.2 0 0 1 0-4.6V6.6H1.2a12 12 0 0 0 0 10.8l4.1-3.1z"/><path fill="#EA4335" d="M12 4.7c1.8 0 3.3.6 4.6 1.8L20 3A12 12 0 0 0 1.2 6.6l4.1 3.1A7.2 7.2 0 0 1 12 4.7z"/></svg>Sign in with Google</button>` : ''}
+    ${a ? `<button class="authbtn apple" onclick="location.href='api/auth/apple'"><svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M16.7 12.9c0-2.4 2-3.6 2.1-3.7-1.1-1.7-2.9-1.9-3.5-1.9-1.5-.2-2.9.9-3.7.9-.8 0-1.9-.9-3.2-.8-1.6 0-3.1 1-4 2.4-1.7 3-.4 7.4 1.2 9.8.8 1.2 1.8 2.5 3.1 2.4 1.2-.1 1.7-.8 3.2-.8s1.9.8 3.2.8c1.3 0 2.2-1.2 3-2.4.9-1.4 1.3-2.7 1.3-2.8-.1 0-2.6-1-2.7-3.9zM14.4 5.6c.7-.8 1.1-1.9 1-3.1-1 0-2.2.7-2.9 1.5-.6.7-1.2 1.9-1 3 1.1.1 2.2-.6 2.9-1.4z"/></svg>Sign in with Apple</button>` : ''}
+    ${!g && !a ? `<div class="card"><b>Not configured yet</b><p class="muted small" style="margin:5px 0 0">Add <b>SESSION_SECRET</b> + <b>GOOGLE_CLIENT_ID</b>/<b>GOOGLE_CLIENT_SECRET</b> (and optionally the APPLE_* variables) in Cloudflare Pages → Settings → Environment variables, then redeploy. Setup steps are in the README.</p></div>` : ''}
+    ${g || a ? `<p class="muted small" style="margin-top:12px">Only your name and email are stored — everything else stays in your account's private sync slot.</p>` : ''}`);
+}
 
 /* ============================================================
    AI PICKS — answered by the /api/ai-pick Cloudflare Pages Function
@@ -996,8 +1171,11 @@ function aiPanelHtml() {
     return `<div class="card" style="margin-top:10px"><b>Almost there — add your API keys</b>
       <p class="muted small" style="margin:5px 0 0">In Cloudflare Pages → your project → <b>Settings → Environment variables</b>, add any of: <b>ANTHROPIC_API_KEY</b> (Fable 5 + Opus 5), <b>OPENAI_API_KEY</b> (GPT-5.6 Sol + Terra), <b>XAI_API_KEY</b> (Grok 4.5). Redeploy and the models appear here automatically.</p></div>`;
   }
-  return `<div class="gpick" id="aimodels" style="margin-top:10px">${entries.map(([k, m]) =>
-    `<button data-ai="${k}" class="${k === aiModel ? 'on' : ''}" ${m.available ? '' : 'disabled style="opacity:.35"'}>🤖 ${esc(m.name)}${m.available ? '' : ' — no key'}</button>`).join('')}</div>`;
+  return `<div class="sublabel">Choose your model</div><div id="aimodels">${entries.map(([k, m]) =>
+    `<button data-ai="${k}" class="aimodel ${k === aiModel ? 'on' : ''}" ${m.available ? '' : 'disabled'}>
+      ${aiLogo(k)}
+      <span class="aimeta"><b>${esc(m.name)}</b><small>${esc(AI_MAKER[k] || '')}${m.available ? '' : ' · no key yet'}</small></span>
+    </button>`).join('')}</div>`;
 }
 function askPasscode() {
   openSheet(`<h3>🔒 Passcode</h3>
@@ -1044,7 +1222,7 @@ async function aiGenerate() {
     toast(e.name === 'AbortError' ? 'The AI took too long — try again' : 'AI request failed — check connection');
   } finally {
     clearTimeout(timer); m.classList.remove('go');
-    const b = $('#genbtn'); if (b) { b.disabled = false; b.textContent = 'Generate'; }
+    const b = $('#genbtn'); if (b) { b.disabled = false; b.textContent = genLabel(); }
   }
 }
 function digitGen(g, kind) {
@@ -1232,30 +1410,44 @@ function editJackpot(g) {
    RENDER — LAB
    ============================================================ */
 let labGame = 'pb', labStrat = 'smart', labCount = 3, labLines = [], manualSel = [], manualBonus = null;
+const genLabel = () => labStrat === 'ai' ? '✨ Generate with AI' : 'Generate';
+function aiFeatureHtml(on) {
+  return `<button class="aifeature ${on ? 'on' : ''}" data-s="ai">
+    <div class="af-head"><span class="af-spark">✨</span><b>AI Pick</b><span class="af-tag">${on ? 'Selected' : 'Featured'}</span></div>
+    <p>A frontier model studies the real draw history, builds statistically-typical low-crowd lines and explains every pick it makes.</p>
+    <div class="af-makers">${aiLogo('fable')}${aiLogo('sol')}${aiLogo('grok')}<span>Fable 5 · Opus 5 · GPT-5.6 · Grok 4.5 — you choose the brain</span></div>
+  </button>`;
+}
 function renderLab() {
   const v = $('#view-lab'); const G = GAMES[labGame];
-  const strats = G.digits ? ['quick', 'hot', 'cold', 'balanced', 'ai'] : G.matrix?.pick === 1 ? ['quick'] : ['quick', 'smart', 'ai', 'hot', 'cold', 'balanced', 'manual'];
-  if (!strats.includes(labStrat)) labStrat = strats[0];
+  const strats = G.digits ? ['ai', 'quick', 'hot', 'cold', 'balanced'] : G.matrix?.pick === 1 ? ['quick'] : ['ai', 'quick', 'smart', 'hot', 'cold', 'balanced', 'manual'];
+  if (!strats.includes(labStrat)) labStrat = G.digits ? 'quick' : 'smart';
+  const hasAI = strats.includes('ai');
+  const aiOn = labStrat === 'ai';
+  v.classList.toggle('aimode', aiOn && !G.infoOnly);
+  const gridHtml = `<div class="stratgrid">
+    ${strats.filter(s => s !== 'ai').map(s => { const st = G.digits && s !== 'manual' ? { name: { quick: 'Quick Pick', hot: 'Hot Digits', cold: 'Cold Digits', balanced: 'Balanced Sum' }[s], desc: { quick: 'Crypto-random digits.', hot: 'Digits hitting most, per position (last 80 draws).', cold: 'Digits hitting least, per position.', balanced: 'Random but keeps the sum mid-range.' }[s], ico: { quick: '🎲', hot: '🔥', cold: '🧊', balanced: '⚖️' }[s] } : STRATS[s];
+      return `<button class="strat ${s === labStrat ? 'on' : ''}" data-s="${s}"><b><span class="ico">${st.ico}</span>${st.name}</b><p>${st.desc}</p></button>`; }).join('')}
+  </div>`;
+  const truthHtml = `<div class="chip truth" style="margin-top:10px" id="truthchip">${STRATS[labStrat] && (!G.digits || labStrat === 'ai') ? esc(STRATS[labStrat].truth) : 'Every combination has identical odds — strategies are about fun and (for Smart Pick) not splitting a shared win.'}</div>`;
+  const ctlHtml = labStrat === 'manual' && !G.digits ? manualBoard() : `
+  <div id="labctl">
+    <div class="stepper"><button id="minus">−</button><b id="lcount">${labCount} line${labCount > 1 ? 's' : ''}</b><button id="plus">+</button></div>
+    <button class="gbtn" id="genbtn" style="flex:1">${genLabel()}</button>
+  </div>`;
+  const tailHtml = `<div id="machine"><div class="drum"></div><div class="mb"></div><div class="mb"></div><div class="mb"></div><div class="mb"></div><div class="mb"></div><div class="mb"></div></div>
+  <div id="labout"></div>`;
   v.innerHTML = `
   <h2 class="sect">Number Lab <small>strategy picks</small></h2>
   <div class="gpick">${GAME_IDS.map(g => `<button data-g="${g}" class="${g === labGame ? 'on' : ''}">${badge(g, 'sm')}${GAMES[g].short}</button>`).join('')}</div>
   ${G.infoOnly ? `<div class="card"><b>Cash Pop</b><p class="muted small" style="margin:6px 0 0">${esc(G.multNote)} Odds are 1 in 15 per number — the picker below is just for fun.</p>
-    <div style="margin-top:12px"><button class="gbtn" id="popgen">Pop me a number</button></div><div id="popout" style="text-align:center;margin-top:14px"></div></div>` : `
-  <div class="stratgrid">
-    ${strats.map(s => { const st = G.digits && !['manual', 'ai'].includes(s) ? { name: { quick: 'Quick Pick', hot: 'Hot Digits', cold: 'Cold Digits', balanced: 'Balanced Sum' }[s], desc: { quick: 'Crypto-random digits.', hot: 'Digits hitting most, per position (last 80 draws).', cold: 'Digits hitting least, per position.', balanced: 'Random but keeps the sum mid-range.' }[s], ico: { quick: '🎲', hot: '🔥', cold: '🧊', balanced: '⚖️' }[s] } : STRATS[s];
-      return `<button class="strat ${s === labStrat ? 'on' : ''}" data-s="${s}"><b><span class="ico">${st.ico}</span>${st.name}</b><p>${st.desc}</p></button>`; }).join('')}
-  </div>
-  <div class="chip truth" style="margin-top:10px" id="truthchip">${STRATS[labStrat] && (!G.digits || labStrat === 'ai') ? esc(STRATS[labStrat].truth) : 'Every combination has identical odds — strategies are about fun and (for Smart Pick) not splitting a shared win.'}</div>
-  ${labStrat === 'ai' ? aiPanelHtml() : ''}
-  ${labStrat === 'manual' && !G.digits ? manualBoard() : `
-  <div id="labctl">
-    <div class="stepper"><button id="minus">−</button><b id="lcount">${labCount} line${labCount > 1 ? 's' : ''}</b><button id="plus">+</button></div>
-    <button class="gbtn" id="genbtn" style="flex:1">Generate</button>
-  </div>`}
-  <div id="machine"><div class="drum"></div><div class="mb"></div><div class="mb"></div><div class="mb"></div><div class="mb"></div><div class="mb"></div><div class="mb"></div></div>
-  <div id="labout"></div>`}`;
+    <div style="margin-top:12px"><button class="gbtn" id="popgen">Pop me a number</button></div><div id="popout" style="text-align:center;margin-top:14px"></div></div>`
+    : `${hasAI ? aiFeatureHtml(aiOn) : ''}
+  ${aiOn
+      ? `<div id="aipanel">${aiPanelHtml()}</div>${truthHtml}${ctlHtml}${tailHtml}<div class="sublabel">More ways to pick</div>${gridHtml}`
+      : `${gridHtml}${truthHtml}${ctlHtml}${tailHtml}`}`}`;
   $$('.gpick button:not([data-ai])', v).forEach(b => { if (b.dataset.g) b.onclick = () => { labGame = b.dataset.g; labLines = []; aiNote = null; manualSel = []; manualBonus = null; renderLab(); }; });
-  $$('.strat', v).forEach(b => b.onclick = () => { labStrat = b.dataset.s; labLines = []; aiNote = null; renderLab(); });
+  $$('.strat, .aifeature', v).forEach(b => b.onclick = () => { labStrat = b.dataset.s; labLines = []; aiNote = null; renderLab(); });
   $$('#aimodels button', v).forEach(b => b.onclick = () => { aiModel = b.dataset.ai; renderLab(); });
   const epSave = $('#aiEpSave');
   if (epSave) epSave.onclick = () => {
@@ -2013,6 +2205,8 @@ $('#btn-alerts').classList.toggle('attn', S.alerts.enabled);
 renderHome();
 scheduleAlerts();
 aiProbe(); // discover which AI models the /api endpoint offers
+authProbe(); // signed in? pull synced tickets/budget/settings
+const acctBtn = $('#btn-acct'); if (acctBtn) acctBtn.onclick = openAccount;
 if (navigator.onLine) syncResults(true); // always refresh on open — draws happen nightly
 // web-hosted copies: pull live.json (refreshed hourly by the cloud job) from the same host
 (async () => {

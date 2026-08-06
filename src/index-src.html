@@ -246,6 +246,56 @@ button.obtn.gold{color:var(--gold); border-color:color-mix(in srgb, var(--gold) 
 .strat p{margin:5px 0 0; font-size:11px; color:var(--ink3); line-height:1.45}
 .strat.on{border-color:var(--gold-deep); background:linear-gradient(180deg, rgba(232,184,75,.14), var(--card)); box-shadow:0 6px 20px var(--gold-glow)}
 .strat .ico{width:17px;height:17px;color:var(--gold)}
+/* featured AI Pick card — the star of the Lab */
+.aifeature{
+  display:block; width:100%; text-align:left; font:inherit; cursor:pointer; color:var(--ink);
+  position:relative; overflow:hidden; border-radius:17px; padding:16px 17px 15px; margin:2px 0 12px;
+  border:1px solid color-mix(in srgb, var(--gold) 48%, transparent);
+  background:
+    radial-gradient(120% 150% at 100% -30%, var(--gold-glow), transparent 60%),
+    linear-gradient(135deg, color-mix(in srgb, var(--gold) 15%, transparent), var(--card) 55%);
+  box-shadow:var(--shadow); transition:border-color .18s, box-shadow .18s, transform .12s;
+}
+.aifeature:active{transform:scale(.985)}
+.aifeature::after{
+  content:""; position:absolute; top:0; bottom:0; width:55%; left:-70%; pointer-events:none;
+  background:linear-gradient(100deg, transparent, color-mix(in srgb, var(--gold-hi) 14%, transparent) 50%, transparent);
+  transform:skewX(-18deg); animation:aisweep 4.6s ease-in-out infinite;
+}
+@keyframes aisweep{0%,55%{left:-70%} 90%,100%{left:130%}}
+.aifeature.on{border-color:var(--gold); box-shadow:0 0 0 1px var(--gold-deep), 0 10px 34px var(--gold-glow)}
+.af-head{display:flex; align-items:center; gap:9px}
+.af-head b{font-family:var(--display); font-size:20px; letter-spacing:.02em}
+.af-spark{font-size:18px; filter:drop-shadow(0 0 9px var(--gold-glow))}
+.af-tag{
+  margin-left:auto; font-size:9.5px; font-weight:800; letter-spacing:.14em; text-transform:uppercase;
+  color:var(--gold); border:1px solid color-mix(in srgb, var(--gold) 50%, transparent);
+  border-radius:99px; padding:4px 10px; background:color-mix(in srgb, var(--gold) 10%, transparent);
+}
+.aifeature p{margin:7px 0 0; font-size:12.5px; color:var(--ink2); line-height:1.5; max-width:56ch}
+.af-makers{display:flex; align-items:center; gap:6px; margin-top:12px; flex-wrap:wrap}
+.af-makers .ailogo{display:block}
+.af-makers .ailogo svg{width:24px; height:24px; display:block; border-radius:7px; box-shadow:0 2px 6px rgba(0,0,0,.35)}
+.af-makers > span{font-size:11px; color:var(--ink3); font-weight:600; margin-left:3px}
+.sublabel{font-size:11px; letter-spacing:.15em; text-transform:uppercase; color:var(--ink3); font-weight:700; margin:16px 2px 8px}
+#aimodels{display:grid; grid-template-columns:repeat(auto-fill,minmax(215px,1fr)); gap:9px; margin-top:2px}
+.aimodel{
+  display:flex; align-items:center; gap:11px; font:inherit; text-align:left; cursor:pointer; color:var(--ink);
+  background:var(--card); border:1px solid var(--card-edge); border-radius:14px; padding:10px 12px; transition:all .15s;
+}
+.aimodel:disabled{opacity:.4; cursor:default}
+.aimodel.on{border-color:var(--gold-deep); box-shadow:0 0 0 1px var(--gold-deep), 0 6px 18px var(--gold-glow); transform:translateY(-1px)}
+.aimodel .ailogo svg{width:38px; height:38px; display:block; border-radius:10px; box-shadow:0 3px 8px rgba(0,0,0,.35)}
+.aimodel .aimeta{display:flex; flex-direction:column; line-height:1.25}
+.aimodel .aimeta b{font-size:13.5px}
+.aimodel .aimeta small{font-size:10.5px; color:var(--ink3); letter-spacing:.04em}
+.authbtn{
+  display:flex; align-items:center; justify-content:center; gap:10px; width:100%; font:inherit; font-weight:700; font-size:14.5px;
+  border-radius:13px; padding:13px; cursor:pointer; margin-top:10px; border:1px solid transparent; transition:transform .12s;
+}
+.authbtn:active{transform:scale(.97)}
+.authbtn.google{background:#fff; color:#1f1f1f; border-color:#dadce0}
+.authbtn.apple{background:#000; color:#fff; border-color:#333}
 #labctl{display:flex; align-items:center; gap:12px; margin:14px 0}
 .stepper{display:flex; align-items:center; gap:2px; background:var(--card); border:1px solid var(--card-edge); border-radius:12px; padding:3px}
 .stepper button{width:34px; height:34px; border:0; background:transparent; color:var(--gold); font-size:20px; font-weight:700; cursor:pointer; border-radius:9px}
@@ -432,14 +482,21 @@ details.rt p{color:var(--ink2); font-size:13px; margin:9px 0 2px; line-height:1.
   /* lab: strategies left, generated lines right */
   #view-lab.on{display:grid; grid-template-columns:minmax(320px,410px) minmax(0,1fr); gap:0 26px; align-items:start}
   #view-lab.on > h2.sect, #view-lab.on > .gpick{grid-column:1/-1}
-  #view-lab.on > .stratgrid{grid-column:1; grid-row:3}
-  #view-lab.on > #truthchip{grid-column:1; grid-row:4}
-  #view-lab.on > #labctl{grid-column:1; grid-row:5}
+  #view-lab.on > .aifeature{grid-column:1; grid-row:3}
+  #view-lab.on > .stratgrid{grid-column:1; grid-row:4}
+  #view-lab.on > #truthchip{grid-column:1; grid-row:5}
+  #view-lab.on > #labctl{grid-column:1; grid-row:6}
   #view-lab.on > .card{grid-column:2; grid-row:3 / span 30}
   #view-lab.on > .card:has(#popgen){grid-column:1/-1; grid-row:auto / span 1}
   #view-lab.on > #machine{grid-column:2; grid-row:3}
   #view-lab.on > #labout{grid-column:2; grid-row:4 / span 30}
   #view-lab.on .stratgrid{grid-template-columns:1fr 1fr}
+  /* lab in AI mode: models + generate stack under the featured card, other strategies drop below */
+  #view-lab.on.aimode > #aipanel{grid-column:1; grid-row:4}
+  #view-lab.on.aimode > #truthchip{grid-row:5}
+  #view-lab.on.aimode > #labctl{grid-row:6}
+  #view-lab.on.aimode > .sublabel{grid-column:1; grid-row:7}
+  #view-lab.on.aimode > .stratgrid{grid-row:8}
   /* tickets: two columns of cards */
   #view-tickets.on{display:grid; grid-template-columns:1fr 1fr; gap:0 16px; align-items:start}
   #view-tickets.on > h2.sect, #view-tickets.on > .tfilter, #view-tickets.on > .footnote, #view-tickets.on > .card:not(.ticket){grid-column:1/-1}
@@ -470,6 +527,9 @@ details.rt p{color:var(--ink2); font-size:13px; margin:9px 0 2px; line-height:1.
       <h1>Jackpot <em>HQ</em></h1>
       <span class="nj">New&nbsp;Jersey</span>
     </div>
+    <button class="hbtn" id="btn-acct" title="Account" aria-label="Account">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="8" r="4"/><path d="M4 21c1.5-3.6 4.5-5.4 8-5.4s6.5 1.8 8 5.4"/></svg>
+    </button>
     <button class="hbtn" id="btn-sync" title="Update results" aria-label="Update results">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M21 12a9 9 0 1 1-2.64-6.36M21 3v6h-6"/></svg>
     </button>

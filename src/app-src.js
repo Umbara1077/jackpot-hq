@@ -263,7 +263,7 @@ catch { S = { ...DEFAULTS }; }
 S.budget = Object.assign({}, DEFAULTS.budget, S.budget);
 S.alerts = Object.assign({}, DEFAULTS.alerts, S.alerts);
 let saveT;
-function save() { clearTimeout(saveT); saveT = setTimeout(() => { try { localStorage.setItem('jhq', JSON.stringify(S)); } catch {} }, 120); }
+function save() { clearTimeout(saveT); saveT = setTimeout(() => { try { localStorage.setItem('jhq', JSON.stringify(S)); } catch {} try { syncPushSoon(); } catch {} }, 120); }
 
 /* results store: seed + fetched/manual merged, ascending by date */
 const RES = {};
@@ -436,8 +436,123 @@ const STRATS = {
     },
   },
   manual: { name: 'My Numbers', ico: '✍️', truth: 'Pick your own — the Lab grades the crowd-factor as you tap.', desc: 'Tap the board to build your line and get instant analysis.', manual: true },
-  ai: { name: 'AI Pick', ico: '🤖', truth: 'No AI can beat randomness — these models build smart low-crowd lines from the real draw history and explain their thinking.', desc: 'Fable 5, Opus 5, Grok 4.5 or GPT-5.6 reasons over the real draw data and explains each pick.', ai: true },
+  ai: { name: 'AI Pick', ico: '✨', truth: 'No AI can beat randomness — these models build smart low-crowd lines from the real draw history and explain their thinking.', desc: 'Claude Fable 5, Opus 5, Grok 4.5 or GPT-5.6 reasons over the real draw data and explains every pick it makes.', ai: true },
 };
+
+/* maker logo marks, drawn as SVG so each model is identifiable at a glance
+   (Claude spark for Anthropic, blossom knot for OpenAI, X mark for xAI) */
+function aiLogo(key) {
+  const spark = (bg) => `<svg viewBox="0 0 40 40"><rect width="40" height="40" rx="10" fill="${bg}"/><g fill="#fdf6ee">${Array.from({ length: 12 }, (_, i) =>
+    `<path d="M20 20 L18.7 9.6 Q20 7.1 21.3 9.6 Z" transform="rotate(${i * 30} 20 20)"/>`).join('')}</g></svg>`;
+  const blossom = (fg) => `<svg viewBox="0 0 40 40"><rect width="40" height="40" rx="10" fill="#0a0a0a"/><g fill="none" stroke="${fg}" stroke-width="2.4">${Array.from({ length: 6 }, (_, i) =>
+    `<rect x="16.5" y="4.8" width="7" height="18.8" rx="3.5" transform="rotate(${i * 60} 20 20)"/>`).join('')}</g></svg>`;
+  const M = {
+    fable: spark('#d97757'),
+    opus: spark('#b85c3f'),
+    grok: `<svg viewBox="0 0 40 40"><rect width="40" height="40" rx="10" fill="#0a0a0a"/><path transform="translate(8 8)" fill="#fff" d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>`,
+    sol: blossom('#fff'),
+    terra: blossom('#7fd4a8'),
+  };
+  return `<span class="ailogo">${M[key] || M.fable}</span>`;
+}
+const AI_MAKER = { fable: 'Anthropic', opus: 'Anthropic', grok: 'xAI', sol: 'OpenAI', terra: 'OpenAI' };
+
+/* ============================================================
+   ACCOUNT + CROSS-DEVICE SYNC — /api/auth/* and /api/sync
+   Sign in with Google/Apple; tickets, budget & settings follow you.
+   ============================================================ */
+let ACCT = { checked: false, user: null, providers: {}, sync: false, lastPush: 0 };
+let syncT = null;
+const onWeb = () => location.protocol !== 'file:' && !(typeof window !== 'undefined' && window.claude);
+async function authProbe() {
+  if (!onWeb()) { ACCT.checked = true; return; }
+  try {
+    const r = await fetch('api/auth/me', { cache: 'no-store' });
+    const j = await r.json();
+    ACCT = { checked: true, user: j.user, providers: j.providers || {}, sync: !!j.sync, lastPush: 0 };
+    if (ACCT.user && ACCT.sync) await syncPull();
+  } catch { ACCT.checked = true; }
+  paintAcctBtn();
+}
+function paintAcctBtn() {
+  const b = $('#btn-acct'); if (!b) return;
+  b.classList.toggle('attn', !!ACCT.user);
+  b.title = ACCT.user ? (ACCT.user.email || ACCT.user.name || 'Signed in') : 'Sign in';
+}
+function syncPayload() {
+  return { tickets: S.tickets, budget: S.budget, jackpots: S.jackpots, alerts: S.alerts, theme: S.theme, aiPass: S.aiPass || '', aiEndpoint: S.aiEndpoint || '', pushedAt: Date.now() };
+}
+function mergeRemote(remote) {
+  if (!remote) return false;
+  let changed = false;
+  // tickets: union by id (never lose a ticket from either device)
+  const byId = new Map((S.tickets || []).map(t => [t.id, t]));
+  for (const t of remote.tickets || []) if (t && t.id && !byId.has(t.id)) { byId.set(t.id, t); changed = true; }
+  S.tickets = [...byId.values()].sort((a, b) => (b.created || '').localeCompare(a.created || '') || String(b.id).localeCompare(String(a.id)));
+  // quick-log entries: union
+  const seen = new Set((S.budget.manual || []).map(m => JSON.stringify(m)));
+  for (const m of remote.budget?.manual || []) { const k = JSON.stringify(m); if (!seen.has(k)) { S.budget.manual.push(m); seen.add(k); changed = true; } }
+  // manual jackpot edits: newest timestamp wins per game
+  for (const [g, j] of Object.entries(remote.jackpots || {})) {
+    if (!S.jackpots[g] || (j.ts || 0) > (S.jackpots[g].ts || 0)) { S.jackpots[g] = j; changed = true; }
+  }
+  // scalar settings: whoever pushed most recently wins
+  if ((remote.pushedAt || 0) > (S.syncedAt || 0)) {
+    if (remote.budget && typeof remote.budget.limit === 'number') S.budget.limit = remote.budget.limit;
+    if (remote.alerts) S.alerts = Object.assign({}, S.alerts, remote.alerts);
+    if (remote.theme) S.theme = remote.theme;
+    if (remote.aiPass) S.aiPass = remote.aiPass;
+    if (remote.aiEndpoint) S.aiEndpoint = remote.aiEndpoint;
+    changed = true;
+  }
+  S.syncedAt = Math.max(S.syncedAt || 0, remote.pushedAt || 0);
+  return changed;
+}
+async function syncPull() {
+  try {
+    const r = await fetch('api/sync', { cache: 'no-store' });
+    if (!r.ok) return;
+    const j = await r.json();
+    if (j.state && mergeRemote(j.state)) { save(); applyTheme(); refreshCurrentView(); }
+  } catch { }
+}
+function syncPushSoon() {
+  if (!onWeb() || !ACCT.user || !ACCT.sync) return;
+  clearTimeout(syncT);
+  syncT = setTimeout(async () => {
+    try {
+      const payload = syncPayload();
+      const r = await fetch('api/sync', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(payload) });
+      if (r.ok) { ACCT.lastPush = Date.now(); S.syncedAt = payload.pushedAt; }
+    } catch { }
+  }, 2500);
+}
+function openAccount() {
+  if (!onWeb()) {
+    return openSheet(`<h3>👤 Account</h3><p class="muted small">Sign-in and cross-device sync work on the website version — open your deployed site and sign in there. This copy keeps everything saved locally.</p>`);
+  }
+  if (ACCT.user) {
+    openSheet(`<h3>👤 ${esc(ACCT.user.name || ACCT.user.email || 'Signed in')}</h3>
+      <p class="muted small">${esc(ACCT.user.email || '')} · via ${esc(ACCT.user.provider)}</p>
+      <div class="card" style="margin-top:12px"><b>${ACCT.sync ? '🔄 Sync is on' : 'Sync not set up'}</b>
+        <p class="muted small" style="margin:5px 0 0">${ACCT.sync
+          ? 'Tickets, budget and settings sync to this account — sign in on your phone and PC to share them.' + (ACCT.lastPush ? ' Last push: just now.' : '')
+          : 'To enable: Cloudflare → Workers & Pages → KV → create a namespace, then bind it to this project as <b>USERS</b> (Settings → Bindings) and redeploy.'}</p>
+        ${ACCT.sync ? '<div class="rowflex" style="margin-top:10px"><button class="obtn gold" id="syncNow">Sync now</button></div>' : ''}
+      </div>
+      <div style="margin-top:14px"><button class="obtn" id="signOut" style="width:100%">Sign out</button></div>`);
+    const sn = $('#syncNow'); if (sn) sn.onclick = async () => { await syncPull(); syncPushSoon(); toast('Synced', true); };
+    $('#signOut').onclick = () => { location.href = 'api/auth/logout'; };
+    return;
+  }
+  const g = ACCT.providers.google, a = ACCT.providers.apple;
+  openSheet(`<h3>👤 Sign in</h3>
+    <p class="muted small">Sign in once and your tickets, budget and settings follow you between phone and PC${AI.passReq ? ' — and AI picks stop asking for the passcode' : ''}.</p>
+    ${g ? `<button class="authbtn google" onclick="location.href='api/auth/google'"><svg viewBox="0 0 24 24" width="18" height="18"><path fill="#4285F4" d="M23.5 12.3c0-.8-.1-1.6-.2-2.3H12v4.5h6.4a5.5 5.5 0 0 1-2.4 3.6v3h3.9c2.3-2.1 3.6-5.2 3.6-8.8z"/><path fill="#34A853" d="M12 24c3.2 0 6-1.1 8-2.9l-3.9-3a7.2 7.2 0 0 1-10.8-3.8H1.2v3.1A12 12 0 0 0 12 24z"/><path fill="#FBBC05" d="M5.3 14.3a7.2 7.2 0 0 1 0-4.6V6.6H1.2a12 12 0 0 0 0 10.8l4.1-3.1z"/><path fill="#EA4335" d="M12 4.7c1.8 0 3.3.6 4.6 1.8L20 3A12 12 0 0 0 1.2 6.6l4.1 3.1A7.2 7.2 0 0 1 12 4.7z"/></svg>Sign in with Google</button>` : ''}
+    ${a ? `<button class="authbtn apple" onclick="location.href='api/auth/apple'"><svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M16.7 12.9c0-2.4 2-3.6 2.1-3.7-1.1-1.7-2.9-1.9-3.5-1.9-1.5-.2-2.9.9-3.7.9-.8 0-1.9-.9-3.2-.8-1.6 0-3.1 1-4 2.4-1.7 3-.4 7.4 1.2 9.8.8 1.2 1.8 2.5 3.1 2.4 1.2-.1 1.7-.8 3.2-.8s1.9.8 3.2.8c1.3 0 2.2-1.2 3-2.4.9-1.4 1.3-2.7 1.3-2.8-.1 0-2.6-1-2.7-3.9zM14.4 5.6c.7-.8 1.1-1.9 1-3.1-1 0-2.2.7-2.9 1.5-.6.7-1.2 1.9-1 3 1.1.1 2.2-.6 2.9-1.4z"/></svg>Sign in with Apple</button>` : ''}
+    ${!g && !a ? `<div class="card"><b>Not configured yet</b><p class="muted small" style="margin:5px 0 0">Add <b>SESSION_SECRET</b> + <b>GOOGLE_CLIENT_ID</b>/<b>GOOGLE_CLIENT_SECRET</b> (and optionally the APPLE_* variables) in Cloudflare Pages → Settings → Environment variables, then redeploy. Setup steps are in the README.</p></div>` : ''}
+    ${g || a ? `<p class="muted small" style="margin-top:12px">Only your name and email are stored — everything else stays in your account's private sync slot.</p>` : ''}`);
+}
 
 /* ============================================================
    AI PICKS — answered by the /api/ai-pick Cloudflare Pages Function
@@ -485,8 +600,11 @@ function aiPanelHtml() {
     return `<div class="card" style="margin-top:10px"><b>Almost there — add your API keys</b>
       <p class="muted small" style="margin:5px 0 0">In Cloudflare Pages → your project → <b>Settings → Environment variables</b>, add any of: <b>ANTHROPIC_API_KEY</b> (Fable 5 + Opus 5), <b>OPENAI_API_KEY</b> (GPT-5.6 Sol + Terra), <b>XAI_API_KEY</b> (Grok 4.5). Redeploy and the models appear here automatically.</p></div>`;
   }
-  return `<div class="gpick" id="aimodels" style="margin-top:10px">${entries.map(([k, m]) =>
-    `<button data-ai="${k}" class="${k === aiModel ? 'on' : ''}" ${m.available ? '' : 'disabled style="opacity:.35"'}>🤖 ${esc(m.name)}${m.available ? '' : ' — no key'}</button>`).join('')}</div>`;
+  return `<div class="sublabel">Choose your model</div><div id="aimodels">${entries.map(([k, m]) =>
+    `<button data-ai="${k}" class="aimodel ${k === aiModel ? 'on' : ''}" ${m.available ? '' : 'disabled'}>
+      ${aiLogo(k)}
+      <span class="aimeta"><b>${esc(m.name)}</b><small>${esc(AI_MAKER[k] || '')}${m.available ? '' : ' · no key yet'}</small></span>
+    </button>`).join('')}</div>`;
 }
 function askPasscode() {
   openSheet(`<h3>🔒 Passcode</h3>
@@ -533,7 +651,7 @@ async function aiGenerate() {
     toast(e.name === 'AbortError' ? 'The AI took too long — try again' : 'AI request failed — check connection');
   } finally {
     clearTimeout(timer); m.classList.remove('go');
-    const b = $('#genbtn'); if (b) { b.disabled = false; b.textContent = 'Generate'; }
+    const b = $('#genbtn'); if (b) { b.disabled = false; b.textContent = genLabel(); }
   }
 }
 function digitGen(g, kind) {
@@ -721,30 +839,44 @@ function editJackpot(g) {
    RENDER — LAB
    ============================================================ */
 let labGame = 'pb', labStrat = 'smart', labCount = 3, labLines = [], manualSel = [], manualBonus = null;
+const genLabel = () => labStrat === 'ai' ? '✨ Generate with AI' : 'Generate';
+function aiFeatureHtml(on) {
+  return `<button class="aifeature ${on ? 'on' : ''}" data-s="ai">
+    <div class="af-head"><span class="af-spark">✨</span><b>AI Pick</b><span class="af-tag">${on ? 'Selected' : 'Featured'}</span></div>
+    <p>A frontier model studies the real draw history, builds statistically-typical low-crowd lines and explains every pick it makes.</p>
+    <div class="af-makers">${aiLogo('fable')}${aiLogo('sol')}${aiLogo('grok')}<span>Fable 5 · Opus 5 · GPT-5.6 · Grok 4.5 — you choose the brain</span></div>
+  </button>`;
+}
 function renderLab() {
   const v = $('#view-lab'); const G = GAMES[labGame];
-  const strats = G.digits ? ['quick', 'hot', 'cold', 'balanced', 'ai'] : G.matrix?.pick === 1 ? ['quick'] : ['quick', 'smart', 'ai', 'hot', 'cold', 'balanced', 'manual'];
-  if (!strats.includes(labStrat)) labStrat = strats[0];
+  const strats = G.digits ? ['ai', 'quick', 'hot', 'cold', 'balanced'] : G.matrix?.pick === 1 ? ['quick'] : ['ai', 'quick', 'smart', 'hot', 'cold', 'balanced', 'manual'];
+  if (!strats.includes(labStrat)) labStrat = G.digits ? 'quick' : 'smart';
+  const hasAI = strats.includes('ai');
+  const aiOn = labStrat === 'ai';
+  v.classList.toggle('aimode', aiOn && !G.infoOnly);
+  const gridHtml = `<div class="stratgrid">
+    ${strats.filter(s => s !== 'ai').map(s => { const st = G.digits && s !== 'manual' ? { name: { quick: 'Quick Pick', hot: 'Hot Digits', cold: 'Cold Digits', balanced: 'Balanced Sum' }[s], desc: { quick: 'Crypto-random digits.', hot: 'Digits hitting most, per position (last 80 draws).', cold: 'Digits hitting least, per position.', balanced: 'Random but keeps the sum mid-range.' }[s], ico: { quick: '🎲', hot: '🔥', cold: '🧊', balanced: '⚖️' }[s] } : STRATS[s];
+      return `<button class="strat ${s === labStrat ? 'on' : ''}" data-s="${s}"><b><span class="ico">${st.ico}</span>${st.name}</b><p>${st.desc}</p></button>`; }).join('')}
+  </div>`;
+  const truthHtml = `<div class="chip truth" style="margin-top:10px" id="truthchip">${STRATS[labStrat] && (!G.digits || labStrat === 'ai') ? esc(STRATS[labStrat].truth) : 'Every combination has identical odds — strategies are about fun and (for Smart Pick) not splitting a shared win.'}</div>`;
+  const ctlHtml = labStrat === 'manual' && !G.digits ? manualBoard() : `
+  <div id="labctl">
+    <div class="stepper"><button id="minus">−</button><b id="lcount">${labCount} line${labCount > 1 ? 's' : ''}</b><button id="plus">+</button></div>
+    <button class="gbtn" id="genbtn" style="flex:1">${genLabel()}</button>
+  </div>`;
+  const tailHtml = `<div id="machine"><div class="drum"></div><div class="mb"></div><div class="mb"></div><div class="mb"></div><div class="mb"></div><div class="mb"></div><div class="mb"></div></div>
+  <div id="labout"></div>`;
   v.innerHTML = `
   <h2 class="sect">Number Lab <small>strategy picks</small></h2>
   <div class="gpick">${GAME_IDS.map(g => `<button data-g="${g}" class="${g === labGame ? 'on' : ''}">${badge(g, 'sm')}${GAMES[g].short}</button>`).join('')}</div>
   ${G.infoOnly ? `<div class="card"><b>Cash Pop</b><p class="muted small" style="margin:6px 0 0">${esc(G.multNote)} Odds are 1 in 15 per number — the picker below is just for fun.</p>
-    <div style="margin-top:12px"><button class="gbtn" id="popgen">Pop me a number</button></div><div id="popout" style="text-align:center;margin-top:14px"></div></div>` : `
-  <div class="stratgrid">
-    ${strats.map(s => { const st = G.digits && !['manual', 'ai'].includes(s) ? { name: { quick: 'Quick Pick', hot: 'Hot Digits', cold: 'Cold Digits', balanced: 'Balanced Sum' }[s], desc: { quick: 'Crypto-random digits.', hot: 'Digits hitting most, per position (last 80 draws).', cold: 'Digits hitting least, per position.', balanced: 'Random but keeps the sum mid-range.' }[s], ico: { quick: '🎲', hot: '🔥', cold: '🧊', balanced: '⚖️' }[s] } : STRATS[s];
-      return `<button class="strat ${s === labStrat ? 'on' : ''}" data-s="${s}"><b><span class="ico">${st.ico}</span>${st.name}</b><p>${st.desc}</p></button>`; }).join('')}
-  </div>
-  <div class="chip truth" style="margin-top:10px" id="truthchip">${STRATS[labStrat] && (!G.digits || labStrat === 'ai') ? esc(STRATS[labStrat].truth) : 'Every combination has identical odds — strategies are about fun and (for Smart Pick) not splitting a shared win.'}</div>
-  ${labStrat === 'ai' ? aiPanelHtml() : ''}
-  ${labStrat === 'manual' && !G.digits ? manualBoard() : `
-  <div id="labctl">
-    <div class="stepper"><button id="minus">−</button><b id="lcount">${labCount} line${labCount > 1 ? 's' : ''}</b><button id="plus">+</button></div>
-    <button class="gbtn" id="genbtn" style="flex:1">Generate</button>
-  </div>`}
-  <div id="machine"><div class="drum"></div><div class="mb"></div><div class="mb"></div><div class="mb"></div><div class="mb"></div><div class="mb"></div><div class="mb"></div></div>
-  <div id="labout"></div>`}`;
+    <div style="margin-top:12px"><button class="gbtn" id="popgen">Pop me a number</button></div><div id="popout" style="text-align:center;margin-top:14px"></div></div>`
+    : `${hasAI ? aiFeatureHtml(aiOn) : ''}
+  ${aiOn
+      ? `<div id="aipanel">${aiPanelHtml()}</div>${truthHtml}${ctlHtml}${tailHtml}<div class="sublabel">More ways to pick</div>${gridHtml}`
+      : `${gridHtml}${truthHtml}${ctlHtml}${tailHtml}`}`}`;
   $$('.gpick button:not([data-ai])', v).forEach(b => { if (b.dataset.g) b.onclick = () => { labGame = b.dataset.g; labLines = []; aiNote = null; manualSel = []; manualBonus = null; renderLab(); }; });
-  $$('.strat', v).forEach(b => b.onclick = () => { labStrat = b.dataset.s; labLines = []; aiNote = null; renderLab(); });
+  $$('.strat, .aifeature', v).forEach(b => b.onclick = () => { labStrat = b.dataset.s; labLines = []; aiNote = null; renderLab(); });
   $$('#aimodels button', v).forEach(b => b.onclick = () => { aiModel = b.dataset.ai; renderLab(); });
   const epSave = $('#aiEpSave');
   if (epSave) epSave.onclick = () => {
@@ -1502,6 +1634,8 @@ $('#btn-alerts').classList.toggle('attn', S.alerts.enabled);
 renderHome();
 scheduleAlerts();
 aiProbe(); // discover which AI models the /api endpoint offers
+authProbe(); // signed in? pull synced tickets/budget/settings
+const acctBtn = $('#btn-acct'); if (acctBtn) acctBtn.onclick = openAccount;
 if (navigator.onLine) syncResults(true); // always refresh on open — draws happen nightly
 // web-hosted copies: pull live.json (refreshed hourly by the cloud job) from the same host
 (async () => {
