@@ -6,12 +6,14 @@
 //   ANTHROPIC_API_KEY  — enables Fable 5 + Opus 5
 //   OPENAI_API_KEY     — enables GPT-5.6 Sol + Terra
 //   XAI_API_KEY        — enables Grok 4.5
+//   GEMINI_API_KEY     — enables Gemini 3.x models (GOOGLE_API_KEY also accepted)
+//   APP_USER / APP_PASSWORD — login gate (defaults admin / admin if unset)
 //   APP_PASSCODE       — optional; if set, requests must carry the matching x-app-pass header
 //
 // Honest by design: no model can raise the odds of winning. The prompt asks for
 // statistically-typical, low-crowd-share lines with reasoning — the same real edge
 // the app's Smart Pick has, plus an actual explanation.
-import { verifySession } from '../_session.js';
+import { verifySession, sessionSecret } from '../_session.js';
 
 const MODELS = {
   fable: { provider: 'anthropic', id: 'claude-fable-5', name: 'Claude Fable 5' },
@@ -19,9 +21,9 @@ const MODELS = {
   grok: { provider: 'xai', id: 'grok-4.5', name: 'Grok 4.5' },
   sol: { provider: 'openai', id: 'gpt-5.6-sol', name: 'GPT-5.6 Sol' },
   terra: { provider: 'openai', id: 'gpt-5.6-terra', name: 'GPT-5.6 Terra' },
-  geminipro: { provider: 'google', id: 'gemini-2.5-pro', name: 'Gemini 2.5 Pro' },
-  geminiflash: { provider: 'google', id: 'gemini-2.5-flash', name: 'Gemini 2.5 Flash' },
-  gemini2flash: { provider: 'google', id: 'gemini-2.0-flash', name: 'Gemini 2.0 Flash' },
+  geminipro: { provider: 'google', id: 'gemini-3.1-pro-preview', name: 'Gemini 3.1 Pro' },
+  geminiflash: { provider: 'google', id: 'gemini-3.6-flash', name: 'Gemini 3.6 Flash' },
+  gemini2flash: { provider: 'google', id: 'gemini-3.5-flash', name: 'Gemini 3.5 Flash' },
 };
 
 const GAMES = {
@@ -65,7 +67,7 @@ export async function onRequestPost(context) {
   const { request, env } = context;
   if (env.APP_PASSCODE && request.headers.get('x-app-pass') !== env.APP_PASSCODE) {
     // signed-in users skip the passcode
-    const user = await verifySession(request.headers.get('cookie'), env.SESSION_SECRET);
+    const user = await verifySession(request.headers.get('cookie'), sessionSecret(env));
     if (!user) return json({ error: 'passcode' }, 401);
   }
 
@@ -77,7 +79,7 @@ export async function onRequestPost(context) {
   if (!M) return json({ error: 'unknown model' }, 400);
   if (!G) return json({ error: 'unknown game' }, 400);
   const apiKey = keyFor(env, M.provider);
-  if (!apiKey) return json({ error: `${M.name} is not configured — add the ${M.provider.toUpperCase()} API key in Cloudflare` }, 503);
+  if (!apiKey) return json({ error: `${M.name} is not configured` }, 503);
 
   const count = Math.min(5, Math.max(1, parseInt(body.count, 10) || 1));
   const prompt = buildPrompt(G, count, body);

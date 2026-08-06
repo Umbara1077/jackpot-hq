@@ -35,8 +35,23 @@ export async function verifySession(cookieHeader, secret) {
   } catch { return null; }
 }
 
-export function sessionCookie(token, maxAgeSec) {
-  return `jhq_sess=${token}; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=${maxAgeSec}`;
+export function sessionSecret(env) {
+  return (env && env.SESSION_SECRET) || 'default_jwt_secret_jhq_2026';
+}
+
+/** @param {boolean} [secure=true] — omit Secure on plain http (local preview) so the cookie sticks */
+export function sessionCookie(token, maxAgeSec, secure = true) {
+  const parts = [
+    `jhq_sess=${token || ''}`,
+    'Path=/',
+    'HttpOnly',
+    'SameSite=Lax',
+    `Max-Age=${Math.max(0, maxAgeSec | 0)}`,
+  ];
+  if (secure) parts.splice(3, 0, 'Secure');
+  // Explicit expiry so browsers reliably drop the cookie on logout
+  if ((maxAgeSec | 0) <= 0) parts.push('Expires=Thu, 01 Jan 1970 00:00:00 GMT');
+  return parts.join('; ');
 }
 
 export function parseJwtPayload(jwt) {

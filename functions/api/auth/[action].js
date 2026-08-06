@@ -1,13 +1,14 @@
-// Sign in with Google / Apple for Jackpot HQ.
-// Routes (action param): google, google-cb, apple, apple-cb, me, logout
+// Password login (+ optional Google / Apple) for Jackpot HQ.
+// Routes (action param): login, me, logout, google, google-cb, apple, apple-cb
 //
 // Env vars (Cloudflare Pages → Settings → Environment variables):
-//   SESSION_SECRET        — required for any sign-in; any long random string
+//   APP_USER / APP_PASSWORD — login credentials (default admin / admin if unset)
+//   SESSION_SECRET          — optional; signs cookies (built-in default exists)
 //   GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET          — enables Google sign-in
 //   APPLE_CLIENT_ID / APPLE_TEAM_ID / APPLE_KEY_ID / APPLE_PRIVATE_KEY — enables Apple sign-in
 //     (APPLE_CLIENT_ID is the Services ID; APPLE_PRIVATE_KEY is the full .p8 file contents.
 //      Sign in with Apple requires an Apple Developer membership.)
-import { b64u, signSession, verifySession, sessionCookie, parseJwtPayload } from '../../_session.js';
+import { b64u, signSession, verifySession, sessionCookie, sessionSecret, parseJwtPayload } from '../../_session.js';
 
 const SESSION_DAYS = 90;
 
@@ -28,14 +29,14 @@ function randomToken() {
   const b = new Uint8Array(16); crypto.getRandomValues(b);
   return [...b].map((x) => x.toString(16).padStart(2, '0')).join('');
 }
-async function establishSession(env, profile) {
+async function establishSession(env, profile, secure = true) {
   const now = Math.floor(Date.now() / 1000);
-  const token = await signSession({ ...profile, iat: now, exp: now + SESSION_DAYS * 86400 }, env.SESSION_SECRET);
+  const token = await signSession({ ...profile, iat: now, exp: now + SESSION_DAYS * 86400 }, sessionSecret(env));
   return new Response(null, {
     status: 302,
     headers: {
       location: '/',
-      'set-cookie': sessionCookie(token, SESSION_DAYS * 86400),
+      'set-cookie': sessionCookie(token, SESSION_DAYS * 86400, secure),
     },
   });
 }
@@ -60,19 +61,30 @@ async function appleClientSecret(env) {
 export async function onRequest(context) {
   const { request, env, params } = context;
   const action = params.action;
-  const origin = new URL(request.url).origin;
+  const url = new URL(request.url);
+  const origin = url.origin;
+  const cookieSecure = url.protocol === 'https:';
+  const secret = sessionSecret(env);
 
   if (action === 'me') {
-    const user = await verifySession(request.headers.get('cookie'), env.SESSION_SECRET || 'default_jwt_secret_jhq_2026');
+    const user = await verifySession(request.headers.get('cookie'), secret);
     return json({
       user: user ? { email: user.email || null, name: user.name || null, provider: user.provider } : null,
-      providers: { google: googleReady(env), apple: appleReady(env), password: !!(env.APP_PASSWORD || env.APP_PASSCODE) },
+      providers: { google: googleReady(env), apple: appleReady(env), password: true },
       sync: !!env.USERS,
     });
   }
 
   if (action === 'logout') {
-    return new Response(null, { status: 302, headers: { location: '/', 'set-cookie': sessionCookie('x', 0) } });
+    const clear = sessionCookie('', 0, cookieSecure);
+    // POST (fetch from the app) or GET (location.href) both clear the session
+    if (request.method === 'POST' || (request.headers.get('accept') || '').includes('application/json')) {
+      return json({ ok: true }, 200, { 'set-cookie': clear });
+    }
+    return new Response(null, {
+      status: 302,
+      headers: { location: '/', 'set-cookie': clear, 'cache-control': 'no-store' },
+    });
   }
 
   if (action === 'login') {
@@ -82,20 +94,17 @@ export async function onRequest(context) {
     const { username, password } = body || {};
     if (!username || !password) return json({ error: 'Username and password required' }, 400);
 
+    // Cloudflare: set APP_USER + APP_PASSWORD. Local / unset → admin / admin.
     const validUser = env.APP_USER || 'admin';
-    const validPass = env.APP_PASSWORD || env.APP_PASSCODE;
-    if (validPass && password !== validPass) {
-      return json({ error: 'Invalid password' }, 401);
-    }
-    if (env.APP_USER && username !== validUser) {
-      return json({ error: 'Invalid username' }, 401);
+    const validPass = env.APP_PASSWORD || env.APP_PASSCODE || 'admin';
+    if (username !== validUser || password !== validPass) {
+      return json({ error: 'Invalid username or password' }, 401);
     }
 
     const now = Math.floor(Date.now() / 1000);
     const profile = { sub: 'u:' + username, email: username, name: username, provider: 'password' };
-    const secret = env.SESSION_SECRET || 'default_jwt_secret_jhq_2026';
     const token = await signSession({ ...profile, iat: now, exp: now + 90 * 86400 }, secret);
-    return json({ ok: true, user: profile }, 200, { 'set-cookie': sessionCookie(token, 90 * 86400) });
+    return json({ ok: true, user: profile }, 200, { 'set-cookie': sessionCookie(token, 90 * 86400, cookieSecure) });
   }
 
   if (action === 'google') {
@@ -127,7 +136,7 @@ export async function onRequest(context) {
     if (!r.ok || !tok.id_token) return loginFailed('Token exchange failed.');
     const p = parseJwtPayload(tok.id_token); // trusted: fetched directly from Google over TLS
     if (!p?.sub) return loginFailed('No identity in the response.');
-    return establishSession(env, { sub: 'g:' + p.sub, email: p.email, name: p.name, provider: 'google' });
+    return establishSession(env, { sub: 'g:' + p.sub, email: p.email, name: p.name, provider: 'google' }, cookieSecure);
   }
 
   if (action === 'apple') {
@@ -165,7 +174,7 @@ export async function onRequest(context) {
     // Apple only sends the user's name on the FIRST authorization, via the `user` form field
     let name = null;
     try { const u = JSON.parse(get('user') || 'null'); name = u?.name ? `${u.name.firstName || ''} ${u.name.lastName || ''}`.trim() : null; } catch { }
-    return establishSession(env, { sub: 'a:' + p.sub, email: p.email || null, name, provider: 'apple' });
+    return establishSession(env, { sub: 'a:' + p.sub, email: p.email || null, name, provider: 'apple' }, cookieSecure);
   }
 
   return json({ error: 'unknown action' }, 404);

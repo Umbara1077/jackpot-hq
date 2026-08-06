@@ -577,21 +577,18 @@ details.rt p{color:var(--ink2); font-size:13px; margin:9px 0 2px; line-height:1.
 }
 .login-card input:focus { border-color: #ff8ad8; box-shadow: 0 0 0 3px rgba(255, 138, 216, 0.25); }
 .login-btn { margin-top: 22px; width: 100%; font-size: 15px; font-weight: 800; padding: 15px; border-radius: 16px; cursor: pointer; }
-.login-hint { margin-top: 20px; padding: 12px 14px; border-radius: 14px; background: rgba(0, 0, 0, 0.3); border: 1px dashed rgba(232, 184, 75, 0.25); font-size: 11.5px; color: var(--ink2); text-align: left; }
-.login-hint b { color: var(--gold); display: block; margin-bottom: 3px; }
-.login-hint p { margin: 0; line-height: 1.4; }
 </style>
 </head>
 <body>
 
-<div id="loginGate" class="login-gate">
+<div id="loginGate" class="login-gate on">
   <div class="login-card">
     <div class="login-brand">
       <div class="login-logo-ring">$</div>
       <h2>Jackpot <em>HQ</em></h2>
       <span class="login-badge">AI Assistant & Lab</span>
     </div>
-    <p class="login-desc">Sign in with your username & password to enter Jackpot HQ.</p>
+    <p class="login-desc">Sign in to continue.</p>
     <form id="loginGateForm" onsubmit="return false;">
       <div class="formrow">
         <label for="gateUser">Username</label>
@@ -599,14 +596,10 @@ details.rt p{color:var(--ink2); font-size:13px; margin:9px 0 2px; line-height:1.
       </div>
       <div class="formrow">
         <label for="gatePass">Password</label>
-        <input id="gatePass" type="password" placeholder="••••••••" value="password" autocomplete="current-password" required>
+        <input id="gatePass" type="password" placeholder="admin" value="admin" autocomplete="current-password" required>
       </div>
-      <button type="submit" class="gbtn aibtn login-btn" id="btnGateSubmit">Sign In to Jackpot HQ</button>
+      <button type="submit" class="gbtn aibtn login-btn" id="btnGateSubmit">Sign In</button>
     </form>
-    <div class="login-hint">
-      <b>⚡ Dev / Local Mode</b>
-      <p>Click <b>Sign In</b> with default username <code>admin</code> and password <code>password</code> (or enter any credentials to test).</p>
-    </div>
   </div>
 </div>
 <div id="app">
