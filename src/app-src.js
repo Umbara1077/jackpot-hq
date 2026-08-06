@@ -898,6 +898,22 @@ function heroCard(g, i) {
     </div>
   </div>`;
 }
+function openAiLab() {
+  labStrat = 'ai';
+  setView('lab');
+  if (!AI.checked) aiProbe();
+}
+function homeAiBannerHtml() {
+  const spark = `<span class="af-spark"><svg viewBox="0 0 24 24"><defs><linearGradient id="homesprk" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ff7ad9"/><stop offset=".55" stop-color="#c56bff"/><stop offset="1" stop-color="#7aa2ff"/></linearGradient></defs><path fill="url(#homesprk)" d="M10.5 2.5 12.6 9l6.5 2.1-6.5 2.1-2.1 6.5-2.1-6.5-6.5-2.1L8.4 9z"/><path fill="url(#homesprk)" d="M18.8 14.6l1 2.9 2.9 1-2.9 1-1 2.9-1-2.9-2.9-1 2.9-1z"/></svg></span>`;
+  return `<button type="button" class="aibanner" id="homeAiBanner">
+    ${spark}
+    <span class="aibanner-text">
+      <b>Try AI Pick</b>
+      <span>Smart lottery lines with a clear reason behind every number</span>
+    </span>
+    <span class="aibanner-go">Open</span>
+  </button>`;
+}
 function renderHome() {
   const v = $('#view-home');
   const heroGames = [...JACKPOT_GAMES].sort((a, b) => jackpotOf(b).amt - jackpotOf(a).amt).slice(0, 3);
@@ -905,11 +921,13 @@ function renderHome() {
   v.innerHTML = `
   <div id="heroStack">${heroGames.map((g, i) => heroCard(g, i)).join('')}</div>
   ${tonight.length ? `<div id="tonightrow"><span class="chip tlabel">🌙 Tonight</span>${tonight.map(x => `<span class="chip" data-open="${x.g}" style="cursor:pointer"><span class="dot" style="background:${GAMES[x.g].color}"></span><b>${GAMES[x.g].name}</b><span class="ctime">${fmtTime(x.nd.when)}</span></span>`).join('')}</div>` : ''}
+  ${homeAiBannerHtml()}
   <h2 class="sect">Games <small>tap a card for rules & odds</small></h2>
   <div class="gamegrid">
     ${GAME_IDS.map(g => gameCard(g)).join('')}
   </div>
   <div class="footnote">Winning numbers auto-update for Powerball, Mega Millions & Millionaire for Life (official state open-data).<br>NJ-only games: tap <b>↻</b> on a game card after the draw to type results in — takes 15 seconds.</div>`;
+  const aiBan = $('#homeAiBanner'); if (aiBan) aiBan.onclick = openAiLab;
   $$('#view-home .gcard, #tonightrow .chip[data-open]').forEach(el => el.addEventListener('click', (e) => {
     if (e.target.closest('[data-editjp]') || e.target.closest('[data-addres]')) return;
     openGameSheet(el.dataset.open || el.dataset.g);

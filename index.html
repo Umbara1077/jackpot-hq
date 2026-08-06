@@ -33,7 +33,8 @@
   --ink:#22261f; --ink2:#565e51; --ink3:#89927f;
   --gold:#9c7420; --gold-hi:#7a5a15; --gold-deep:#b98a2b; --gold-glow:rgba(156,116,32,.22);
   --mark-gold:#9c7420; --mark-cool:#3d6fb4; --mark-mid:#9aa192;
-  --aiA:#c93da6; --aiB:#7c4dd4; --aiC:#3d6fb4; --ai-glow:rgba(201,61,166,.18);
+  /* deeper AI pinks for readable gradient text on light backgrounds */
+  --aiA:#9a1874; --aiB:#5b2db3; --aiC:#254f9e; --ai-glow:rgba(154,24,116,.16);
   --ok:#1e7d4f; --warn:#95700f; --bad:#b02a3e;
   --shadow:0 10px 30px rgba(70,55,20,.16), 0 2px 6px rgba(70,55,20,.10);
 }
@@ -273,6 +274,10 @@ button.obtn.gold{color:var(--gold); border-color:color-mix(in srgb, var(--gold) 
 .af-head{display:flex; align-items:center; gap:9px}
 .af-head b{
   font-family:var(--display); font-size:22px; font-weight:700; letter-spacing:-.01em;
+  background:linear-gradient(120deg, var(--aiA) 0%, var(--aiB) 55%, var(--aiC) 100%);
+  -webkit-background-clip:text; background-clip:text; color:transparent;
+}
+:root:not([data-theme="light"]) .af-head b{
   background:linear-gradient(120deg, #ff8ad8 0%, #ffffff 45%, #b06ef7 80%, #7aa2ff 100%);
   -webkit-background-clip:text; background-clip:text; color:transparent;
 }
@@ -284,7 +289,53 @@ button.obtn.gold{color:var(--gold); border-color:color-mix(in srgb, var(--gold) 
   background:linear-gradient(135deg, rgba(255,138,216,.3), rgba(176,110,247,.3));
   box-shadow:0 2px 10px rgba(255,138,216,.2);
 }
+:root[data-theme="light"] .af-tag{
+  color:#fff; border-color:rgba(154,24,116,.35);
+  background:linear-gradient(135deg, #c0268a, #6b2fb8);
+  box-shadow:0 2px 10px rgba(154,24,116,.22);
+}
 .aifeature p{margin:8px 0 0; font-size:13px; color:var(--ink2); line-height:1.5; max-width:58ch}
+
+/* home AI CTA — pill banner → Lab AI Pick */
+.aibanner{
+  display:flex; align-items:center; gap:12px; width:100%; margin:14px 0 2px; padding:11px 12px 11px 16px;
+  border:1px solid rgba(255,138,216,.28); border-radius:999px; cursor:pointer; font:inherit; text-align:left; color:var(--ink);
+  background:
+    radial-gradient(120% 160% at 100% 0%, rgba(255,138,216,.18), transparent 55%),
+    linear-gradient(100deg, rgba(255,255,255,.08), rgba(176,110,247,.08));
+  box-shadow:0 6px 22px rgba(255,138,216,.12), var(--shadow);
+  transition:transform .15s ease, box-shadow .2s ease, border-color .2s ease;
+}
+.aibanner:hover{border-color:rgba(255,138,216,.5); box-shadow:0 8px 28px rgba(255,138,216,.2), var(--shadow)}
+.aibanner:active{transform:scale(.985)}
+.aibanner .af-spark{flex:none}
+.aibanner-text{display:flex; flex-direction:column; gap:2px; min-width:0; flex:1}
+.aibanner-text b{
+  font-size:15px; font-weight:800; letter-spacing:.01em; line-height:1.2;
+  background:linear-gradient(120deg, var(--aiA) 0%, var(--aiB) 55%, var(--aiC) 100%);
+  -webkit-background-clip:text; background-clip:text; color:transparent;
+}
+:root:not([data-theme="light"]) .aibanner-text b{
+  background:linear-gradient(120deg, #ff8ad8 0%, #ffd0ef 40%, #c9a6ff 100%);
+  -webkit-background-clip:text; background-clip:text; color:transparent;
+}
+.aibanner-text span{font-size:12px; color:var(--ink2); line-height:1.35; white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
+.aibanner-go{
+  flex:none; font-size:13px; font-weight:800; color:#fff; letter-spacing:.02em;
+  padding:8px 18px; border-radius:999px;
+  background:linear-gradient(135deg, #e8439f 0%, #8b4dff 100%);
+  box-shadow:0 4px 14px rgba(232,67,159,.35);
+}
+:root[data-theme="light"] .aibanner{
+  border-color:rgba(154,24,116,.22);
+  background:
+    radial-gradient(120% 160% at 100% 0%, rgba(201,61,166,.12), transparent 55%),
+    linear-gradient(100deg, #fffafc, #f3e8ff);
+}
+@media(max-width:420px){
+  .aibanner-text span{display:none}
+  .aibanner{padding-left:14px}
+}
 /* AI-mode generate button takes Copilot pink gradient */
 button.gbtn.aibtn{
   color:#ffffff; font-weight:800; letter-spacing:.04em;
@@ -505,6 +556,7 @@ details.rt p{color:var(--ink2); font-size:13px; margin:9px 0 2px; line-height:1.
   #view-home.on .hero:first-child{padding:26px 20px 22px}
   #view-home.on .hero:first-child .amt{font-size:clamp(46px, 4.6vw, 74px)}
   #view-home.on > #tonightrow{padding-top:0}
+  #view-home.on > .aibanner{margin-top:10px}
   #view-home.on h2.sect{margin-top:6px}
   /* lab: strategies left, generated lines right */
   #view-lab.on{display:grid; grid-template-columns:minmax(320px,410px) minmax(0,1fr); gap:0 26px; align-items:start}
@@ -1550,6 +1602,22 @@ function heroCard(g, i) {
     </div>
   </div>`;
 }
+function openAiLab() {
+  labStrat = 'ai';
+  setView('lab');
+  if (!AI.checked) aiProbe();
+}
+function homeAiBannerHtml() {
+  const spark = `<span class="af-spark"><svg viewBox="0 0 24 24"><defs><linearGradient id="homesprk" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ff7ad9"/><stop offset=".55" stop-color="#c56bff"/><stop offset="1" stop-color="#7aa2ff"/></linearGradient></defs><path fill="url(#homesprk)" d="M10.5 2.5 12.6 9l6.5 2.1-6.5 2.1-2.1 6.5-2.1-6.5-6.5-2.1L8.4 9z"/><path fill="url(#homesprk)" d="M18.8 14.6l1 2.9 2.9 1-2.9 1-1 2.9-1-2.9-2.9-1 2.9-1z"/></svg></span>`;
+  return `<button type="button" class="aibanner" id="homeAiBanner">
+    ${spark}
+    <span class="aibanner-text">
+      <b>Try AI Pick</b>
+      <span>Smart lottery lines with a clear reason behind every number</span>
+    </span>
+    <span class="aibanner-go">Open</span>
+  </button>`;
+}
 function renderHome() {
   const v = $('#view-home');
   const heroGames = [...JACKPOT_GAMES].sort((a, b) => jackpotOf(b).amt - jackpotOf(a).amt).slice(0, 3);
@@ -1557,11 +1625,13 @@ function renderHome() {
   v.innerHTML = `
   <div id="heroStack">${heroGames.map((g, i) => heroCard(g, i)).join('')}</div>
   ${tonight.length ? `<div id="tonightrow"><span class="chip tlabel">🌙 Tonight</span>${tonight.map(x => `<span class="chip" data-open="${x.g}" style="cursor:pointer"><span class="dot" style="background:${GAMES[x.g].color}"></span><b>${GAMES[x.g].name}</b><span class="ctime">${fmtTime(x.nd.when)}</span></span>`).join('')}</div>` : ''}
+  ${homeAiBannerHtml()}
   <h2 class="sect">Games <small>tap a card for rules & odds</small></h2>
   <div class="gamegrid">
     ${GAME_IDS.map(g => gameCard(g)).join('')}
   </div>
   <div class="footnote">Winning numbers auto-update for Powerball, Mega Millions & Millionaire for Life (official state open-data).<br>NJ-only games: tap <b>↻</b> on a game card after the draw to type results in — takes 15 seconds.</div>`;
+  const aiBan = $('#homeAiBanner'); if (aiBan) aiBan.onclick = openAiLab;
   $$('#view-home .gcard, #tonightrow .chip[data-open]').forEach(el => el.addEventListener('click', (e) => {
     if (e.target.closest('[data-editjp]') || e.target.closest('[data-addres]')) return;
     openGameSheet(el.dataset.open || el.dataset.g);
