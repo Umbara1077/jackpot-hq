@@ -22,4 +22,6 @@ jobs:
           git config user.name 'jackpot-hq-bot'
           git config user.email 'actions@users.noreply.github.com'
           git add live.json
-          git diff --cached --quiet || (git commit -m "data: refresh $(date -u +'%Y-%m-%dT%H:%MZ')" && git push)
+          git diff --cached --quiet && echo "no new data" && exit 0
+          git commit -m "data: refresh $(date -u +'%Y-%m-%dT%H:%MZ')"
+          git push   # pushing to main triggers pages.yml, republishing the site with fresh data
