@@ -19,7 +19,28 @@ Your NJ Lottery tracker & number lab. Built Aug 5, 2026.
 | `src/index-src.html` | HTML/CSS shell source used by the bundler |
 | `src/seeds.js` | Embedded real draw history (NJ-only games) |
 | `src/build.js` | Bundles everything into one portable file + the artifact variant |
+| `functions/api/ai-pick.js` | Cloudflare Pages Function that answers AI Pick requests |
+| `scripts/fetch-live.mjs` + `.github/workflows/refresh.yml` | Hourly cloud data refresh (`live.json`) |
 | `DESIGN.md` | Design doc: games, odds, features, architecture |
+
+## AI Picks (Fable 5 · Opus 5 · Grok 4.5 · GPT-5.6)
+
+The Lab's **AI Pick** strategy sends the game rules + recent real draws to a model of your
+choice and returns picks with per-line reasoning. It runs through `functions/api/ai-pick.js`
+on Cloudflare so API keys never touch the browser.
+
+Setup (Cloudflare Pages → your project → **Settings → Environment variables**, then redeploy):
+
+| Variable | Unlocks |
+|---|---|
+| `ANTHROPIC_API_KEY` | Claude Fable 5 + Claude Opus 5 (console.anthropic.com) |
+| `OPENAI_API_KEY` | GPT-5.6 Sol + Terra (platform.openai.com) |
+| `XAI_API_KEY` | Grok 4.5 (console.x.ai) |
+| `APP_PASSCODE` | Optional but recommended — a passcode the app asks for once, so strangers who find your URL can't spend your API credits |
+
+The app auto-detects which models are configured. Honest fine print: no AI improves the odds —
+they build statistically-typical, low-crowd-share lines and explain them. Cost per pick request
+is roughly $0.01–0.05 (Grok/Terra/Opus) up to ~$0.10 (Fable 5).
 
 ## Live data on this PC
 

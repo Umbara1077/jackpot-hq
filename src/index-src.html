@@ -275,10 +275,11 @@ button.obtn.gold{color:var(--gold); border-color:color-mix(in srgb, var(--gold) 
 @keyframes bounce2{from{transform:translate(0,0)} to{transform:translate(18px,-20px) rotate(-30deg)}}
 @keyframes bounce3{from{transform:translate(0,0)} to{transform:translate(-8px,22px) rotate(25deg)}}
 .line{
-  display:flex; align-items:center; gap:10px; padding:12px; border-radius:15px;
+  display:flex; align-items:center; gap:10px; padding:12px; border-radius:15px; flex-wrap:wrap;
   background:color-mix(in srgb, var(--card-solid) 80%, transparent); border:1px solid var(--card-edge); margin-top:9px;
 }
 .line .meta{margin-left:auto; text-align:right; display:flex; flex-direction:column; gap:4px; align-items:flex-end}
+.aiwhy{flex-basis:100%; font-size:11.5px; color:var(--ink2); font-style:italic; line-height:1.45; margin-top:2px}
 .digitrow{display:flex; gap:8px}
 .digit{
   width:46px; height:58px; border-radius:12px; display:grid; place-items:center;

@@ -275,10 +275,11 @@ button.obtn.gold{color:var(--gold); border-color:color-mix(in srgb, var(--gold) 
 @keyframes bounce2{from{transform:translate(0,0)} to{transform:translate(18px,-20px) rotate(-30deg)}}
 @keyframes bounce3{from{transform:translate(0,0)} to{transform:translate(-8px,22px) rotate(25deg)}}
 .line{
-  display:flex; align-items:center; gap:10px; padding:12px; border-radius:15px;
+  display:flex; align-items:center; gap:10px; padding:12px; border-radius:15px; flex-wrap:wrap;
   background:color-mix(in srgb, var(--card-solid) 80%, transparent); border:1px solid var(--card-edge); margin-top:9px;
 }
 .line .meta{margin-left:auto; text-align:right; display:flex; flex-direction:column; gap:4px; align-items:flex-end}
+.aiwhy{flex-basis:100%; font-size:11.5px; color:var(--ink2); font-style:italic; line-height:1.45; margin-top:2px}
 .digitrow{display:flex; gap:8px}
 .digit{
   width:46px; height:58px; border-radius:12px; display:grid; place-items:center;
@@ -946,7 +947,106 @@ const STRATS = {
     },
   },
   manual: { name: 'My Numbers', ico: '✍️', truth: 'Pick your own — the Lab grades the crowd-factor as you tap.', desc: 'Tap the board to build your line and get instant analysis.', manual: true },
+  ai: { name: 'AI Pick', ico: '🤖', truth: 'No AI can beat randomness — these models build smart low-crowd lines from the real draw history and explain their thinking.', desc: 'Fable 5, Opus 5, Grok 4.5 or GPT-5.6 reasons over the real draw data and explains each pick.', ai: true },
 };
+
+/* ============================================================
+   AI PICKS — answered by the /api/ai-pick Cloudflare Pages Function
+   (API keys live in Cloudflare env vars, never in the browser)
+   ============================================================ */
+let AI = { checked: false, ok: false, models: {}, passReq: false };
+let aiModel = null, aiNote = null;
+function aiEndpoint() {
+  if (typeof window !== 'undefined' && window.claude) return null; // hosted artifact: platform blocks outside calls
+  if (location.protocol === 'file:') {
+    if (!S.aiEndpoint) return null;
+    const base = S.aiEndpoint.trim().replace(/\/+$/, '');
+    return /\/api\/ai-pick$/.test(base) ? base : base + '/api/ai-pick';
+  }
+  return 'api/ai-pick';
+}
+async function aiProbe() {
+  const ep = aiEndpoint();
+  if (!ep) { AI = { checked: true, ok: false, models: {}, passReq: false }; return; }
+  try {
+    const r = await fetch(ep, { cache: 'no-store' });
+    const j = await r.json();
+    AI = { checked: true, ok: !!j.ok, models: j.models || {}, passReq: !!j.passcodeRequired };
+    const avail = Object.keys(AI.models).filter(k => AI.models[k].available);
+    if (!aiModel || !avail.includes(aiModel)) aiModel = avail[0] || null;
+  } catch { AI = { checked: true, ok: false, models: {}, passReq: false }; }
+  if (curView === 'lab') renderLab();
+}
+function aiPanelHtml() {
+  const ep = aiEndpoint();
+  if (!ep && typeof window !== 'undefined' && window.claude) {
+    return `<div class="card" style="margin-top:10px"><b>🤖 AI picks live on the website</b><p class="muted small" style="margin:5px 0 0">This hosted copy can't reach outside servers — open your deployed site for AI picks.</p></div>`;
+  }
+  if (!ep) {
+    return `<div class="card" style="margin-top:10px"><b>🤖 Connect to your site once</b>
+      <p class="muted small" style="margin:5px 0 8px">Enter your deployed site URL — its server answers AI requests so your API keys stay private.</p>
+      <div class="formrow"><label>Site URL</label><input id="aiEpIn" placeholder="https://jackpot-hq.pages.dev" value="${esc(S.aiEndpoint || '')}"></div>
+      <div class="formrow"><label>Passcode (only if you set APP_PASSCODE)</label><input id="aiPassIn" placeholder="optional" value="${esc(S.aiPass || '')}"></div>
+      <div style="margin-top:12px"><button class="gbtn" id="aiEpSave">Connect</button></div></div>`;
+  }
+  if (!AI.checked) return `<div class="card" style="margin-top:10px"><span class="muted small">Checking AI availability…</span></div>`;
+  if (!AI.ok) return `<div class="card" style="margin-top:10px"><b>AI endpoint unreachable</b><p class="muted small" style="margin:5px 0 0">Couldn't reach ${esc(ep)}. If you just deployed, give it a minute, then switch tabs and back to retry.</p></div>`;
+  const entries = Object.entries(AI.models);
+  if (!entries.some(([, m]) => m.available)) {
+    return `<div class="card" style="margin-top:10px"><b>Almost there — add your API keys</b>
+      <p class="muted small" style="margin:5px 0 0">In Cloudflare Pages → your project → <b>Settings → Environment variables</b>, add any of: <b>ANTHROPIC_API_KEY</b> (Fable 5 + Opus 5), <b>OPENAI_API_KEY</b> (GPT-5.6 Sol + Terra), <b>XAI_API_KEY</b> (Grok 4.5). Redeploy and the models appear here automatically.</p></div>`;
+  }
+  return `<div class="gpick" id="aimodels" style="margin-top:10px">${entries.map(([k, m]) =>
+    `<button data-ai="${k}" class="${k === aiModel ? 'on' : ''}" ${m.available ? '' : 'disabled style="opacity:.35"'}>🤖 ${esc(m.name)}${m.available ? '' : ' — no key'}</button>`).join('')}</div>`;
+}
+function askPasscode() {
+  openSheet(`<h3>🔒 Passcode</h3>
+    <p class="muted small">This AI endpoint is protected. Enter the passcode you set as APP_PASSCODE in Cloudflare.</p>
+    <div class="formrow"><label>Passcode</label><input id="aiPassEntry" value="${esc(S.aiPass || '')}"></div>
+    <div style="margin-top:14px"><button class="gbtn" id="aiPassOk">Save & retry</button></div>`);
+  $('#aiPassOk').onclick = () => { S.aiPass = $('#aiPassEntry').value.trim(); save(); closeSheet(); aiGenerate(); };
+}
+async function aiGenerate() {
+  const G = GAMES[labGame];
+  const ep = aiEndpoint();
+  if (!ep || !AI.ok) return toast('AI isn\'t connected here yet');
+  if (!aiModel || !AI.models[aiModel]?.available) return toast('Pick an AI model first');
+  const m = $('#machine'); const out = $('#labout'); out.innerHTML = ''; m.classList.add('go');
+  const gb = $('#genbtn'); if (gb) { gb.disabled = true; gb.textContent = AI.models[aiModel].name + ' is thinking…'; }
+  const recent = (RES[labGame] || []).slice(-15).map(r => G.digits
+    ? `${r.d}${r.t ? '/' + r.t : ''}: ${r.n}${r.f ? ' FB' + r.f : ''}`
+    : `${r.d}: ${r.n.join(' ')}${r.b != null ? ' +' + r.b : ''}`);
+  let hot = [], cold = [];
+  if (!G.digits && G.matrix && G.matrix.pick > 1) {
+    const { f, last, draws } = freqTable(labGame, 60);
+    const items = Array.from({ length: G.matrix.max }, (_, i) => ({ n: i + 1, c: f[i + 1], gap: last[i + 1] < 0 ? draws : draws - 1 - last[i + 1] }));
+    hot = [...items].sort((a, b) => b.c - a.c).slice(0, 5).map(x => x.n);
+    cold = [...items].sort((a, b) => b.gap - a.gap).slice(0, 5).map(x => x.n);
+  }
+  const J = (G.jackpotSeed || G.fixedJackpot) ? jackpotOf(labGame) : null;
+  const ctrl = new AbortController(); const timer = setTimeout(() => ctrl.abort(), 120000);
+  try {
+    const r = await fetch(ep, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', ...(S.aiPass ? { 'x-app-pass': S.aiPass } : {}) },
+      body: JSON.stringify({ model: aiModel, game: labGame, count: Math.min(5, labCount), recent, hot, cold, jackpot: J ? fmtMoney(J.amt) : null }),
+      signal: ctrl.signal,
+    });
+    const j = await r.json().catch(() => ({ error: 'bad response from endpoint' }));
+    if (r.status === 401) { askPasscode(); return; }
+    if (!r.ok || !j.ok) { toast(j.error || 'AI error ' + r.status); return; }
+    labLines = j.lines.map(L => G.digits
+      ? ({ n: L.numbers.join(''), why: L.why })
+      : ({ n: L.numbers, b: (G.matrix.bonusMax && !G.matrix.bullseye) ? L.bonus : null, why: L.why }));
+    aiNote = j.note ? `${j.model} — ${j.note}` : j.model;
+    paintLines();
+  } catch (e) {
+    toast(e.name === 'AbortError' ? 'The AI took too long — try again' : 'AI request failed — check connection');
+  } finally {
+    clearTimeout(timer); m.classList.remove('go');
+    const b = $('#genbtn'); if (b) { b.disabled = false; b.textContent = 'Generate'; }
+  }
+}
 function digitGen(g, kind) {
   const D = GAMES[g].digits; const rows = RES[g] || [];
   const posFreq = Array.from({ length: D }, () => new Array(10).fill(0));
@@ -1134,7 +1234,7 @@ function editJackpot(g) {
 let labGame = 'pb', labStrat = 'smart', labCount = 3, labLines = [], manualSel = [], manualBonus = null;
 function renderLab() {
   const v = $('#view-lab'); const G = GAMES[labGame];
-  const strats = G.digits ? ['quick', 'hot', 'cold', 'balanced'] : G.matrix?.pick === 1 ? ['quick'] : ['quick', 'smart', 'hot', 'cold', 'balanced', 'manual'];
+  const strats = G.digits ? ['quick', 'hot', 'cold', 'balanced', 'ai'] : G.matrix?.pick === 1 ? ['quick'] : ['quick', 'smart', 'ai', 'hot', 'cold', 'balanced', 'manual'];
   if (!strats.includes(labStrat)) labStrat = strats[0];
   v.innerHTML = `
   <h2 class="sect">Number Lab <small>strategy picks</small></h2>
@@ -1142,10 +1242,11 @@ function renderLab() {
   ${G.infoOnly ? `<div class="card"><b>Cash Pop</b><p class="muted small" style="margin:6px 0 0">${esc(G.multNote)} Odds are 1 in 15 per number — the picker below is just for fun.</p>
     <div style="margin-top:12px"><button class="gbtn" id="popgen">Pop me a number</button></div><div id="popout" style="text-align:center;margin-top:14px"></div></div>` : `
   <div class="stratgrid">
-    ${strats.map(s => { const st = G.digits && s !== 'manual' ? { name: { quick: 'Quick Pick', hot: 'Hot Digits', cold: 'Cold Digits', balanced: 'Balanced Sum' }[s], desc: { quick: 'Crypto-random digits.', hot: 'Digits hitting most, per position (last 80 draws).', cold: 'Digits hitting least, per position.', balanced: 'Random but keeps the sum mid-range.' }[s], ico: { quick: '🎲', hot: '🔥', cold: '🧊', balanced: '⚖️' }[s] } : STRATS[s];
+    ${strats.map(s => { const st = G.digits && !['manual', 'ai'].includes(s) ? { name: { quick: 'Quick Pick', hot: 'Hot Digits', cold: 'Cold Digits', balanced: 'Balanced Sum' }[s], desc: { quick: 'Crypto-random digits.', hot: 'Digits hitting most, per position (last 80 draws).', cold: 'Digits hitting least, per position.', balanced: 'Random but keeps the sum mid-range.' }[s], ico: { quick: '🎲', hot: '🔥', cold: '🧊', balanced: '⚖️' }[s] } : STRATS[s];
       return `<button class="strat ${s === labStrat ? 'on' : ''}" data-s="${s}"><b><span class="ico">${st.ico}</span>${st.name}</b><p>${st.desc}</p></button>`; }).join('')}
   </div>
-  <div class="chip truth" style="margin-top:10px" id="truthchip">${STRATS[labStrat] && !G.digits ? esc(STRATS[labStrat].truth) : 'Every combination has identical odds — strategies are about fun and (for Smart Pick) not splitting a shared win.'}</div>
+  <div class="chip truth" style="margin-top:10px" id="truthchip">${STRATS[labStrat] && (!G.digits || labStrat === 'ai') ? esc(STRATS[labStrat].truth) : 'Every combination has identical odds — strategies are about fun and (for Smart Pick) not splitting a shared win.'}</div>
+  ${labStrat === 'ai' ? aiPanelHtml() : ''}
   ${labStrat === 'manual' && !G.digits ? manualBoard() : `
   <div id="labctl">
     <div class="stepper"><button id="minus">−</button><b id="lcount">${labCount} line${labCount > 1 ? 's' : ''}</b><button id="plus">+</button></div>
@@ -1153,8 +1254,14 @@ function renderLab() {
   </div>`}
   <div id="machine"><div class="drum"></div><div class="mb"></div><div class="mb"></div><div class="mb"></div><div class="mb"></div><div class="mb"></div><div class="mb"></div></div>
   <div id="labout"></div>`}`;
-  $$('.gpick button', v).forEach(b => b.onclick = () => { labGame = b.dataset.g; labLines = []; manualSel = []; manualBonus = null; renderLab(); });
-  $$('.strat', v).forEach(b => b.onclick = () => { labStrat = b.dataset.s; labLines = []; renderLab(); });
+  $$('.gpick button:not([data-ai])', v).forEach(b => { if (b.dataset.g) b.onclick = () => { labGame = b.dataset.g; labLines = []; aiNote = null; manualSel = []; manualBonus = null; renderLab(); }; });
+  $$('.strat', v).forEach(b => b.onclick = () => { labStrat = b.dataset.s; labLines = []; aiNote = null; renderLab(); });
+  $$('#aimodels button', v).forEach(b => b.onclick = () => { aiModel = b.dataset.ai; renderLab(); });
+  const epSave = $('#aiEpSave');
+  if (epSave) epSave.onclick = () => {
+    S.aiEndpoint = $('#aiEpIn').value.trim(); S.aiPass = $('#aiPassIn').value.trim(); save();
+    AI.checked = false; renderLab(); aiProbe();
+  };
   if (G.infoOnly) { const pg = $('#popgen'); if (pg) pg.onclick = () => { $('#popout').innerHTML = `<div class="ballrow popin" style="justify-content:center"><span class="ball" style="--tint:#ffc0e5">${1 + rnd(15)}</span></div>`; }; return; }
   if (labStrat === 'manual' && !G.digits) { wireManual(); return; }
   $('#minus').onclick = () => { labCount = Math.max(1, labCount - 1); $('#lcount').textContent = labCount + ' line' + (labCount > 1 ? 's' : ''); };
@@ -1163,7 +1270,9 @@ function renderLab() {
   if (labLines.length) paintLines();
 }
 function generate() {
+  if (labStrat === 'ai') return aiGenerate();
   const G = GAMES[labGame];
+  aiNote = null;
   const m = $('#machine'); const out = $('#labout'); out.innerHTML = ''; m.classList.add('go');
   $('#genbtn').disabled = true;
   setTimeout(() => {
@@ -1190,8 +1299,10 @@ function paintLines() {
       <div class="meta">
         ${cs ? `<span class="chip" title="How many other players likely share numbers like these"><span class="dot" style="background:${cs.score <= 20 ? 'var(--ok)' : cs.score <= 45 ? 'var(--warn)' : 'var(--bad)'}"></span>crowd ${cs.score}</span>` : ''}
         <span class="chip">sum ${sum}</span>
-      </div></div>`;
+      </div>
+      ${L.why ? `<div class="aiwhy">“${esc(L.why)}”</div>` : ''}</div>`;
   }).join('') + `
+  ${aiNote ? `<div class="chip" style="margin-top:11px;color:var(--gold);border-color:var(--gold-deep)">🤖 ${esc(aiNote)}</div>` : ''}
   <div class="rowflex" style="margin-top:13px">
     <button class="gbtn" id="saveticket" style="flex:2;min-width:180px">Save as ticket</button>
     <button class="obtn" id="copylines">Copy</button>
@@ -1901,6 +2012,7 @@ applyTheme();
 $('#btn-alerts').classList.toggle('attn', S.alerts.enabled);
 renderHome();
 scheduleAlerts();
+aiProbe(); // discover which AI models the /api endpoint offers
 if (navigator.onLine) syncResults(true); // always refresh on open — draws happen nightly
 // web-hosted copies: pull live.json (refreshed hourly by the cloud job) from the same host
 (async () => {
