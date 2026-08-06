@@ -268,6 +268,9 @@ function save() { clearTimeout(saveT); saveT = setTimeout(() => { try { localSto
 /* results store: seed + fetched/manual merged, ascending by date */
 const RES = {};
 function resKey(r) { return r.d + (r.t ? ':' + r.t : ''); }
+// chronological sort key — plain resKey would put "E"vening before "M"idday alphabetically
+function sortKey(r) { return r.d + (r.t ? (r.t === 'M' ? ':1' : ':2') : ''); }
+const byDraw = (a, b) => sortKey(a) < sortKey(b) ? -1 : sortKey(a) > sortKey(b) ? 1 : 0;
 function initResults() {
   for (const g of TRACKED) {
     const seed = (typeof SEED_DRAWS !== 'undefined' && SEED_DRAWS[GAMES[g].seed]) || [];
@@ -275,14 +278,14 @@ function initResults() {
     const extra = S.results[g] || [];
     const map = new Map();
     for (const r of [...seedNorm, ...extra]) map.set(resKey(r), r);
-    RES[g] = [...map.values()].sort((a, b) => resKey(a) < resKey(b) ? -1 : 1);
+    RES[g] = [...map.values()].sort(byDraw);
   }
 }
 function addResults(g, rows) {
   const map = new Map(RES[g].map(r => [resKey(r), r]));
   let added = 0;
   for (const r of rows) { const k = resKey(r); if (!map.has(k)) added++; map.set(k, r); }
-  RES[g] = [...map.values()].sort((a, b) => resKey(a) < resKey(b) ? -1 : 1);
+  RES[g] = [...map.values()].sort(byDraw);
   S.results[g] = RES[g].slice(-400); // persist a rolling window
   save();
   return added;
@@ -1341,6 +1344,7 @@ window.setView = setView;
 function refreshCurrentView() {
   ({ home: renderHome, lab: renderLab, tickets: renderTickets, stats: renderStats, budget: renderBudget })[curView]();
 }
+window.refreshCurrentView = refreshCurrentView;
 $$('#tabbar button').forEach(b => b.onclick = () => setView(b.dataset.v));
 $('#btn-sync').onclick = () => syncResults(false);
 $('#btn-alerts').onclick = openAlerts;
@@ -1367,34 +1371,33 @@ function tickCountdowns() {
 setInterval(tickCountdowns, 1000);
 setInterval(() => { if (curView === 'home' && !$('#sheet').classList.contains('on')) renderHome(); }, 30000);
 
-/* ---------- boot ---------- */
-initResults();
-// merge results delivered by the background updater (live.js), if present
-try {
-  const L = liveData();
-  if (L && L.results) for (const g of ['jc5', 'p6', 'p3', 'p4']) {
+/* ---------- live data (from the hourly cloud job, or the local PC updater) ---------- */
+function applyLiveData(L) {
+  L = L || liveData();
+  if (!L || !L.asof) return false;
+  if (window.JHQ_LIVE && L.asof < (window.JHQ_LIVE.asof || 0)) return false;
+  window.JHQ_LIVE = L;
+  if (L.results) for (const g of ['jc5', 'p6', 'p3', 'p4']) {
     if (Array.isArray(L.results[g]) && L.results[g].length) addResults(g, L.results[g]);
   }
-} catch { }
+  return true;
+}
+window.applyLiveData = applyLiveData;
+
+/* ---------- boot ---------- */
+initResults();
+try { applyLiveData(); } catch { }
 applyTheme();
 $('#btn-alerts').classList.toggle('attn', S.alerts.enabled);
 renderHome();
 scheduleAlerts();
-if (navigator.onLine && Date.now() - (S.lastSync || 0) > 6 * 3600e3) syncResults(true);
+if (navigator.onLine) syncResults(true); // always refresh on open — draws happen nightly
 // web-hosted copies: pull live.json (refreshed hourly by the cloud job) from the same host
 (async () => {
-  if (location.protocol === 'file:') return; // PC copy gets live.js instead
+  if (location.protocol === 'file:') return; // PC copy loads live.js instead (see index.html)
   try {
     const r = await fetch('live.json?_=' + Date.now(), { cache: 'no-store' });
     if (!r.ok) return;
-    const L = await r.json();
-    if (!L || !L.asof) return;
-    if (!window.JHQ_LIVE || L.asof > (window.JHQ_LIVE.asof || 0)) {
-      window.JHQ_LIVE = L;
-      if (L.results) for (const g of ['jc5', 'p6', 'p3', 'p4']) {
-        if (Array.isArray(L.results[g]) && L.results[g].length) addResults(g, L.results[g]);
-      }
-      refreshCurrentView();
-    }
+    if (applyLiveData(await r.json())) refreshCurrentView();
   } catch { }
 })();

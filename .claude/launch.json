@@ -4,7 +4,7 @@
     {
       "name": "jackpot-hq",
       "runtimeExecutable": "node",
-      "runtimeArgs": ["C:\\Users\\DANTEC~1\\AppData\\Local\\Temp\\claude\\C--Users-DanteCorso-OneDrive---RC-Computers--LLC-Documents-Lotto\\01fedb64-6eb6-465d-a27a-ab32641d7664\\scratchpad\\server.js"],
+      "runtimeArgs": ["scripts/serve.mjs"],
       "port": 8123
     }
   ]

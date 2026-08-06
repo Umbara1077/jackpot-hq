@@ -503,7 +503,16 @@ details.rt p{color:var(--ink2); font-size:13px; margin:9px 0 2px; line-height:1.
 <div id="tip"></div>
 <canvas id="confetti"></canvas>
 
-<script src="file:///C:/Users/DanteCorso/AppData/Local/JackpotHQ/live.js"></script>
 <!--__APP__-->
+<script>
+/* Running straight off the disk? Pull the local updater's data (the hosted copy
+   fetches live.json from its own server instead — see the app's boot code). */
+if (location.protocol === 'file:') {
+  var s = document.createElement('script');
+  s.src = 'file:///C:/Users/DanteCorso/AppData/Local/JackpotHQ/live.js';
+  s.onload = function () { if (window.applyLiveData && window.applyLiveData()) window.refreshCurrentView && window.refreshCurrentView(); };
+  document.head.appendChild(s);
+}
+</script>
 </body>
 </html>

@@ -1,26 +1,28 @@
-// Builds ../index.html (standalone) and artifact.html (for the Claude artifact) from src files.
+// Bundles src/{index-src.html, seeds.js, app-src.js} into the standalone index.html at the repo root.
+// Usage: node src/build.js [extraOutDir]   (extraOutDir also gets artifact.html for publishing)
 const fs = require('fs');
 const path = require('path');
+
 const src = __dirname;
 const root = path.join(src, '..');
-const scratch = process.argv[2]; // scratchpad dir containing seeds.js
-if (!scratch) { console.error('usage: node build.js <scratchpad-dir-with-seeds.js>'); process.exit(1); }
+const extraOut = process.argv[2] || null;
 
 const shell = fs.readFileSync(path.join(src, 'index-src.html'), 'utf8');
-const seeds = fs.readFileSync(path.join(scratch, 'seeds.js'), 'utf8');
+const seeds = fs.readFileSync(path.join(src, 'seeds.js'), 'utf8');
 const app = fs.readFileSync(path.join(src, 'app-src.js'), 'utf8');
 
+if (!shell.includes('<!--__APP__-->')) { console.error('placeholder <!--__APP__--> missing from index-src.html'); process.exit(1); }
+
 const scriptBlock = '<script>\n' + seeds + '\n' + app + '\n</script>';
-if (!shell.includes('<!--__APP__-->')) { console.error('placeholder missing'); process.exit(1); }
-const full = shell.replace('<!--__APP__-->', () => scriptBlock); // function form: '$$' in code must not be treated as a replace pattern
-fs.writeFileSync(path.join(scratch, 'index.html'), full);
+// function form of replace: the app code contains "$$", which is a special pattern in string replacements
+const full = shell.replace('<!--__APP__-->', () => scriptBlock);
+fs.writeFileSync(path.join(root, 'index.html'), full);
 
-// artifact variant: page content only (no doctype/html/head/body) — keep title, meta theme, style, markup, script
-const bodyInner = full
-  .replace(/^[\s\S]*?<body>/, '')
-  .replace(/<\/body>\s*<\/html>\s*$/, '');
-const styleMatch = full.match(/<style>[\s\S]*?<\/style>/);
-const artifact = '<title>NJ Jackpot HQ</title>\n' + styleMatch[0] + '\n' + bodyInner;
-fs.writeFileSync(path.join(scratch, 'artifact.html'), artifact);
+// artifact variant: page content only — no doctype/html/head/body wrapper
+if (extraOut) {
+  const bodyInner = full.replace(/^[\s\S]*?<body>/, '').replace(/<\/body>\s*<\/html>\s*$/, '');
+  const style = full.match(/<style>[\s\S]*?<\/style>/)[0];
+  fs.writeFileSync(path.join(extraOut, 'artifact.html'), '<title>NJ Jackpot HQ</title>\n' + style + '\n' + bodyInner);
+}
 
-console.log('OK index.html', (full.length / 1024).toFixed(1) + 'KB · artifact.html', (artifact.length / 1024).toFixed(1) + 'KB');
+console.log('built index.html', (full.length / 1024).toFixed(1) + 'KB' + (extraOut ? ' (+ artifact.html)' : ''));
