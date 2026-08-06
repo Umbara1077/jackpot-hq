@@ -63,16 +63,39 @@ export async function onRequest(context) {
   const origin = new URL(request.url).origin;
 
   if (action === 'me') {
-    const user = await verifySession(request.headers.get('cookie'), env.SESSION_SECRET);
+    const user = await verifySession(request.headers.get('cookie'), env.SESSION_SECRET || 'default_jwt_secret_jhq_2026');
     return json({
       user: user ? { email: user.email || null, name: user.name || null, provider: user.provider } : null,
-      providers: { google: googleReady(env), apple: appleReady(env) },
+      providers: { google: googleReady(env), apple: appleReady(env), password: !!(env.APP_PASSWORD || env.APP_PASSCODE) },
       sync: !!env.USERS,
     });
   }
 
   if (action === 'logout') {
     return new Response(null, { status: 302, headers: { location: '/', 'set-cookie': sessionCookie('x', 0) } });
+  }
+
+  if (action === 'login') {
+    if (request.method !== 'POST') return json({ error: 'POST required' }, 405);
+    let body;
+    try { body = await request.json(); } catch { return json({ error: 'invalid request' }, 400); }
+    const { username, password } = body || {};
+    if (!username || !password) return json({ error: 'Username and password required' }, 400);
+
+    const validUser = env.APP_USER || 'admin';
+    const validPass = env.APP_PASSWORD || env.APP_PASSCODE;
+    if (validPass && password !== validPass) {
+      return json({ error: 'Invalid password' }, 401);
+    }
+    if (env.APP_USER && username !== validUser) {
+      return json({ error: 'Invalid username' }, 401);
+    }
+
+    const now = Math.floor(Date.now() / 1000);
+    const profile = { sub: 'u:' + username, email: username, name: username, provider: 'password' };
+    const secret = env.SESSION_SECRET || 'default_jwt_secret_jhq_2026';
+    const token = await signSession({ ...profile, iat: now, exp: now + 90 * 86400 }, secret);
+    return json({ ok: true, user: profile }, 200, { 'set-cookie': sessionCookie(token, 90 * 86400) });
   }
 
   if (action === 'google') {

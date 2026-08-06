@@ -19,6 +19,9 @@ const MODELS = {
   grok: { provider: 'xai', id: 'grok-4.5', name: 'Grok 4.5' },
   sol: { provider: 'openai', id: 'gpt-5.6-sol', name: 'GPT-5.6 Sol' },
   terra: { provider: 'openai', id: 'gpt-5.6-terra', name: 'GPT-5.6 Terra' },
+  geminipro: { provider: 'google', id: 'gemini-2.5-pro', name: 'Gemini 2.5 Pro' },
+  geminiflash: { provider: 'google', id: 'gemini-2.5-flash', name: 'Gemini 2.5 Flash' },
+  gemini2flash: { provider: 'google', id: 'gemini-2.0-flash', name: 'Gemini 2.0 Flash' },
 };
 
 const GAMES = {
@@ -41,7 +44,10 @@ const json = (obj, status = 200) =>
   new Response(JSON.stringify(obj), { status, headers: { 'content-type': 'application/json', ...CORS } });
 
 const keyFor = (env, provider) =>
-  provider === 'anthropic' ? env.ANTHROPIC_API_KEY : provider === 'openai' ? env.OPENAI_API_KEY : env.XAI_API_KEY;
+  provider === 'anthropic' ? env.ANTHROPIC_API_KEY :
+  provider === 'openai' ? env.OPENAI_API_KEY :
+  provider === 'xai' ? env.XAI_API_KEY :
+  provider === 'google' ? (env.GEMINI_API_KEY || env.GOOGLE_API_KEY) : null;
 
 export async function onRequestOptions() {
   return new Response(null, { status: 204, headers: CORS });
@@ -77,17 +83,20 @@ export async function onRequestPost(context) {
   const prompt = buildPrompt(G, count, body);
 
   try {
-    const raw = M.provider === 'anthropic'
-      ? await callAnthropic(apiKey, M.id, prompt)
-      : await callOpenAICompatible(M.provider, apiKey, M.id, prompt);
+    const callApi = (pPrompt) =>
+      M.provider === 'anthropic'
+        ? callAnthropic(apiKey, M.id, pPrompt)
+        : M.provider === 'google'
+        ? callGemini(apiKey, M.id, pPrompt)
+        : callOpenAICompatible(M.provider, apiKey, M.id, pPrompt);
+
+    const raw = await callApi(prompt);
 
     const picks = extractJson(raw);
     const check = validate(picks, G, count);
     if (!check.ok) {
       // one corrective retry, then give up honestly
-      const retryRaw = M.provider === 'anthropic'
-        ? await callAnthropic(apiKey, M.id, prompt + `\n\nYour previous answer was invalid: ${check.reason}. Return corrected JSON only.`)
-        : await callOpenAICompatible(M.provider, apiKey, M.id, prompt + `\n\nYour previous answer was invalid: ${check.reason}. Return corrected JSON only.`);
+      const retryRaw = await callApi(prompt + `\n\nYour previous answer was invalid: ${check.reason}. Return corrected JSON only.`);
       const retryPicks = extractJson(retryRaw);
       const retryCheck = validate(retryPicks, G, count);
       if (!retryCheck.ok) return json({ error: `${M.name} returned invalid picks (${retryCheck.reason}) — try again` }, 502);
@@ -212,6 +221,23 @@ async function callOpenAICompatible(provider, apiKey, model, prompt) {
   const msg = data.choices?.[0]?.message?.content;
   if (!msg) throw new Error('empty response');
   return msg;
+}
+
+async function callGemini(apiKey, model, prompt) {
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+  const r = await fetch(url, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({
+      contents: [{ parts: [{ text: prompt }] }],
+      generationConfig: { responseMimeType: 'application/json' }
+    }),
+  });
+  const data = await r.json();
+  if (!r.ok) throw new Error(data?.error?.message || `HTTP ${r.status}`);
+  const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
+  if (!text) throw new Error('empty response from Gemini');
+  return text;
 }
 
 /* ---------------- parsing + validation ---------------- */

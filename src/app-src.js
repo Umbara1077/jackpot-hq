@@ -439,23 +439,28 @@ const STRATS = {
   ai: { name: 'AI Pick', ico: '✨', truth: 'No AI can beat randomness — these models build smart low-crowd lines from the real draw history and explain their thinking.', desc: 'Claude Fable 5, Opus 5, Grok 4.5 or GPT-5.6 reasons over the real draw data and explains every pick it makes.', ai: true },
 };
 
-/* maker logo marks, drawn as SVG so each model is identifiable at a glance
-   (Claude spark for Anthropic, blossom knot for OpenAI, X mark for xAI) */
+/* official maker logos: Claude spark for Anthropic models, OpenAI blossom for GPT,
+   X mark for xAI/Grok, Gemini star for Google Gemini. */
+const LOGO_PATHS = {
+  claude: 'm4.7144 15.9555 4.7174-2.6471.079-.2307-.079-.1275h-.2307l-.7893-.0486-2.6956-.0729-2.3375-.0971-2.2646-.1214-.5707-.1215-.5343-.7042.0546-.3522.4797-.3218.686.0608 1.5179.1032 2.2767.1578 1.6514.0972 2.4468.255h.3886l.0546-.1579-.1336-.0971-.1032-.0972L6.973 9.8356l-2.55-1.6879-1.3356-.9714-.7225-.4918-.3643-.4614-.1578-1.0078.6557-.7225.8803.0607.2246.0607.8925.686 1.9064 1.4754 2.4893 1.8336.3643.3035.1457-.1032.0182-.0728-.164-.2733-1.3539-2.4467-1.445-2.4893-.6435-1.032-.17-.6194c-.0607-.255-.1032-.4674-.1032-.7285L6.287.1335 6.6997 0l.9957.1336.419.3642.6192 1.4147 1.0018 2.2282 1.5543 3.0296.4553.8985.2429.8318.091.255h.1579v-.1457l.1275-1.706.2368-2.0947.2307-2.6957.0789-.7589.3764-.9107.7468-.4918.5828.2793.4797.686-.0668.4433-.2853 1.8517-.5586 2.9021-.3643 1.9429h.2125l.2429-.2429.9835-1.3053 1.6514-2.0643.7286-.8196.85-.9046.5464-.4311h1.0321l.759 1.1293-.34 1.1657-1.0625 1.3478-.8804 1.1414-1.2628 1.7-.7893 1.36.0729.1093.1882-.0183 2.8535-.607 1.5421-.2794 1.8396-.3157.8318.3886.091.3946-.3278.8075-1.967.4857-2.3072.4614-3.4364.8136-.0425.0304.0486.0607 1.5482.1457.6618.0364h1.621l3.0175.2247.7892.522.4736.6376-.079.4857-1.2142.6193-1.6393-.3886-3.825-.9107-1.3113-.3279h-.1822v.1093l1.0929 1.0686 2.0035 1.8092 2.5075 2.3314.1275.5768-.3218.4554-.34-.0486-2.2039-1.6575-.85-.7468-1.9246-1.621h-.1275v.17l.4432.6496 2.3436 3.5214.1214 1.0807-.17.3521-.6071.2125-.6679-.1214-1.3721-1.9246L14.38 17.959l-1.1414-1.9428-.1397.079-.674 7.2552-.3156.3703-.7286.2793-.6071-.4614-.3218-.7468.3218-1.4753.3886-1.9246.3157-1.53.2853-1.9004.17-.6314-.0121-.0425-.1397.0182-1.4328 1.9672-2.1796 2.9446-1.7243 1.8456-.4128.164-.7164-.3704.0667-.6618.4008-.5889 2.386-3.0357 1.4389-1.882.929-1.0868-.0062-.1579h-.0546l-6.3385 4.1164-1.1293.1457-.4857-.4554.0608-.7467.2307-.2429 1.9064-1.3114Z',
+  openai: 'M22.2819 9.8211a5.9847 5.9847 0 0 0-.5157-4.9108 6.0462 6.0462 0 0 0-6.5098-2.9A6.0651 6.0651 0 0 0 4.9807 4.1818a5.9847 5.9847 0 0 0-3.9977 2.9 6.0462 6.0462 0 0 0 .7427 7.0966 5.98 5.98 0 0 0 .511 4.9107 6.051 6.051 0 0 0 6.5146 2.9001A5.9847 5.9847 0 0 0 13.2599 24a6.0557 6.0557 0 0 0 5.7718-4.2058 5.9894 5.9894 0 0 0 3.9977-2.9001 6.0557 6.0557 0 0 0-.7475-7.0729zm-9.022 12.6081a4.4755 4.4755 0 0 1-2.8764-1.0408l.1419-.0804 4.7783-2.7582a.7948.7948 0 0 0 .3927-.6813v-6.7369l2.02 1.1686a.071.071 0 0 1 .038.052v5.5826a4.504 4.504 0 0 1-4.4945 4.4944zm-9.6607-4.1254a4.4708 4.4708 0 0 1-.5346-3.0137l.142.0852 4.783 2.7582a.7712.7712 0 0 0 .7806 0l5.8428-3.3685v2.3324a.0804.0804 0 0 1-.0332.0615L9.74 19.9502a4.4992 4.4992 0 0 1-6.1408-1.6464zM2.3408 7.8956a4.485 4.485 0 0 1 2.3655-1.9728V11.6a.7664.7664 0 0 0 .3879.6765l5.8144 3.3543-2.0201 1.1685a.0757.0757 0 0 1-.071 0l-4.8303-2.7865A4.504 4.504 0 0 1 2.3408 7.872zm16.5963 3.8558L13.1038 8.364 15.1192 7.2a.0757.0757 0 0 1 .071 0l4.8303 2.7913a4.4944 4.4944 0 0 1-.6765 8.1042v-5.6772a.79.79 0 0 0-.407-.667zm2.0107-3.0231l-.142-.0852-4.7735-2.7818a.7759.7759 0 0 0-.7854 0L9.409 9.2297V6.8974a.0662.0662 0 0 1 .0284-.0615l4.8303-2.7866a4.4992 4.4992 0 0 1 6.6802 4.66zM8.3065 12.863l-2.02-1.1638a.0804.0804 0 0 1-.038-.0567V6.0742a4.4992 4.4992 0 0 1 7.3757-3.4537l-.142.0805L8.704 5.459a.7948.7948 0 0 0-.3927.6813zm1.0976-2.3654l2.602-1.4998 2.6069 1.4998v2.9994l-2.5974 1.4997-2.6067-1.4997Z',
+  x: 'M14.234 10.162 22.977 0h-2.072l-7.591 8.824L7.251 0H.258l9.168 13.343L.258 24H2.33l8.016-9.318L16.749 24h6.993zm-2.837 3.299-.929-1.329L3.076 1.56h3.182l5.965 8.532.929 1.329 7.754 11.09h-3.182z',
+  gemini: 'M20 2C20 12, 28 20, 38 20C28 20, 20 28, 20 38C20 28, 12 20, 2 20C12 20, 20 12, 20 2Z',
+};
 function aiLogo(key) {
-  const spark = (bg) => `<svg viewBox="0 0 40 40"><rect width="40" height="40" rx="10" fill="${bg}"/><g fill="#fdf6ee">${Array.from({ length: 12 }, (_, i) =>
-    `<path d="M20 20 L18.7 9.6 Q20 7.1 21.3 9.6 Z" transform="rotate(${i * 30} 20 20)"/>`).join('')}</g></svg>`;
-  const blossom = (fg) => `<svg viewBox="0 0 40 40"><rect width="40" height="40" rx="10" fill="#0a0a0a"/><g fill="none" stroke="${fg}" stroke-width="2.4">${Array.from({ length: 6 }, (_, i) =>
-    `<rect x="16.5" y="4.8" width="7" height="18.8" rx="3.5" transform="rotate(${i * 60} 20 20)"/>`).join('')}</g></svg>`;
+  const tile = (bg, fg, path) => `<svg viewBox="0 0 40 40"><rect width="40" height="40" rx="10" fill="${bg}"/><path transform="translate(8 8)" fill="${fg}" d="${LOGO_PATHS[path]}"/></svg>`;
+  const geminiTile = `<svg viewBox="0 0 40 40"><rect width="40" height="40" rx="10" fill="#131722"/><defs><linearGradient id="gemGrad" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#4285F4"/><stop offset="35%" stop-color="#9B51E0"/><stop offset="70%" stop-color="#EA4335"/><stop offset="100%" stop-color="#FBBC05"/></linearGradient></defs><path fill="url(#gemGrad)" d="${LOGO_PATHS.gemini}"/></svg>`;
   const M = {
-    fable: spark('#d97757'),
-    opus: spark('#b85c3f'),
-    grok: `<svg viewBox="0 0 40 40"><rect width="40" height="40" rx="10" fill="#0a0a0a"/><path transform="translate(8 8)" fill="#fff" d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>`,
-    sol: blossom('#fff'),
-    terra: blossom('#7fd4a8'),
+    fable: tile('#d97757', '#fdf6ee', 'claude'),
+    opus: tile('#b85c3f', '#fdf6ee', 'claude'),
+    grok: tile('#000', '#fff', 'x'),
+    sol: tile('#0f0f10', '#10a37f', 'openai'),
+    terra: tile('#0f0f10', '#7fd4a8', 'openai'),
+    gemini: geminiTile,
   };
   return `<span class="ailogo">${M[key] || M.fable}</span>`;
 }
-const AI_MAKER = { fable: 'Anthropic', opus: 'Anthropic', grok: 'xAI', sol: 'OpenAI', terra: 'OpenAI' };
+const AI_MAKER = { fable: 'Anthropic', opus: 'Anthropic', grok: 'xAI', sol: 'OpenAI', terra: 'OpenAI', gemini: 'Google' };
 
 /* ============================================================
    ACCOUNT + CROSS-DEVICE SYNC — /api/auth/* and /api/sync
@@ -528,30 +533,62 @@ function syncPushSoon() {
   }, 2500);
 }
 function openAccount() {
-  if (!onWeb()) {
-    return openSheet(`<h3>👤 Account</h3><p class="muted small">Sign-in and cross-device sync work on the website version — open your deployed site and sign in there. This copy keeps everything saved locally.</p>`);
-  }
   if (ACCT.user) {
-    openSheet(`<h3>👤 ${esc(ACCT.user.name || ACCT.user.email || 'Signed in')}</h3>
-      <p class="muted small">${esc(ACCT.user.email || '')} · via ${esc(ACCT.user.provider)}</p>
-      <div class="card" style="margin-top:12px"><b>${ACCT.sync ? '🔄 Sync is on' : 'Sync not set up'}</b>
-        <p class="muted small" style="margin:5px 0 0">${ACCT.sync
-          ? 'Tickets, budget and settings sync to this account — sign in on your phone and PC to share them.' + (ACCT.lastPush ? ' Last push: just now.' : '')
-          : 'To enable: Cloudflare → Workers & Pages → KV → create a namespace, then bind it to this project as <b>USERS</b> (Settings → Bindings) and redeploy.'}</p>
+    openSheet(`<h3>👤 Account: ${esc(ACCT.user.name || 'Signed In')}</h3>
+      <p class="muted small">Signed in as <b>${esc(ACCT.user.name)}</b></p>
+      <div class="card" style="margin-top:12px">
+        <b>${ACCT.sync ? '🔄 Account Sync Active' : 'Account Status: Active'}</b>
+        <p class="muted small" style="margin:5px 0 0">Your session is active. Tickets and settings stay saved securely.</p>
         ${ACCT.sync ? '<div class="rowflex" style="margin-top:10px"><button class="obtn gold" id="syncNow">Sync now</button></div>' : ''}
       </div>
       <div style="margin-top:14px"><button class="obtn" id="signOut" style="width:100%">Sign out</button></div>`);
     const sn = $('#syncNow'); if (sn) sn.onclick = async () => { await syncPull(); syncPushSoon(); toast('Synced', true); };
-    $('#signOut').onclick = () => { location.href = 'api/auth/logout'; };
+    $('#signOut').onclick = () => {
+      ACCT.user = null;
+      if (onWeb()) location.href = 'api/auth/logout';
+      else { save(); closeSheet(); paintAcctBtn(); toast('Signed out', true); }
+    };
     return;
   }
-  const g = ACCT.providers.google, a = ACCT.providers.apple;
-  openSheet(`<h3>👤 Sign in</h3>
-    <p class="muted small">Sign in once and your tickets, budget and settings follow you between phone and PC${AI.passReq ? ' — and AI picks stop asking for the passcode' : ''}.</p>
-    ${g ? `<button class="authbtn google" onclick="location.href='api/auth/google'"><svg viewBox="0 0 24 24" width="18" height="18"><path fill="#4285F4" d="M23.5 12.3c0-.8-.1-1.6-.2-2.3H12v4.5h6.4a5.5 5.5 0 0 1-2.4 3.6v3h3.9c2.3-2.1 3.6-5.2 3.6-8.8z"/><path fill="#34A853" d="M12 24c3.2 0 6-1.1 8-2.9l-3.9-3a7.2 7.2 0 0 1-10.8-3.8H1.2v3.1A12 12 0 0 0 12 24z"/><path fill="#FBBC05" d="M5.3 14.3a7.2 7.2 0 0 1 0-4.6V6.6H1.2a12 12 0 0 0 0 10.8l4.1-3.1z"/><path fill="#EA4335" d="M12 4.7c1.8 0 3.3.6 4.6 1.8L20 3A12 12 0 0 0 1.2 6.6l4.1 3.1A7.2 7.2 0 0 1 12 4.7z"/></svg>Sign in with Google</button>` : ''}
-    ${a ? `<button class="authbtn apple" onclick="location.href='api/auth/apple'"><svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M16.7 12.9c0-2.4 2-3.6 2.1-3.7-1.1-1.7-2.9-1.9-3.5-1.9-1.5-.2-2.9.9-3.7.9-.8 0-1.9-.9-3.2-.8-1.6 0-3.1 1-4 2.4-1.7 3-.4 7.4 1.2 9.8.8 1.2 1.8 2.5 3.1 2.4 1.2-.1 1.7-.8 3.2-.8s1.9.8 3.2.8c1.3 0 2.2-1.2 3-2.4.9-1.4 1.3-2.7 1.3-2.8-.1 0-2.6-1-2.7-3.9zM14.4 5.6c.7-.8 1.1-1.9 1-3.1-1 0-2.2.7-2.9 1.5-.6.7-1.2 1.9-1 3 1.1.1 2.2-.6 2.9-1.4z"/></svg>Sign in with Apple</button>` : ''}
-    ${!g && !a ? `<div class="card"><b>Not configured yet</b><p class="muted small" style="margin:5px 0 0">Add <b>SESSION_SECRET</b> + <b>GOOGLE_CLIENT_ID</b>/<b>GOOGLE_CLIENT_SECRET</b> (and optionally the APPLE_* variables) in Cloudflare Pages → Settings → Environment variables, then redeploy. Setup steps are in the README.</p></div>` : ''}
-    ${g || a ? `<p class="muted small" style="margin-top:12px">Only your name and email are stored — everything else stays in your account's private sync slot.</p>` : ''}`);
+
+  openSheet(`<h3>👤 Sign In</h3>
+    <p class="muted small">Sign in with your username and password to unlock your account and sync settings.</p>
+    <div class="card" style="margin-top:10px">
+      <b>🔑 Account Login</b>
+      <div class="formrow"><label>Username</label><input id="accUser" placeholder="admin" value="admin"></div>
+      <div class="formrow"><label>Password</label><input id="accPass" type="password" placeholder="Enter password"></div>
+      <div style="margin-top:14px"><button class="gbtn" id="accLoginBtn">Sign In</button></div>
+      <p class="muted small" style="margin-top:10px">Set <b>APP_USER</b> & <b>APP_PASSWORD</b> in Cloudflare Pages environment variables (defaults to <code>admin</code>).</p>
+    </div>`);
+
+  const btn = $('#accLoginBtn');
+  if (btn) btn.onclick = async () => {
+    const username = $('#accUser').value.trim();
+    const password = $('#accPass').value.trim();
+    if (!username || !password) return toast('Enter username and password');
+
+    if (onWeb()) {
+      try {
+        const r = await fetch('api/auth/login', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ username, password })
+        });
+        const j = await r.json();
+        if (!r.ok || !j.ok) return toast(j.error || 'Login failed');
+        toast('Signed in as ' + j.user.name, true);
+        closeSheet();
+        await authProbe();
+        return;
+      } catch { }
+    }
+
+    // Local / direct sign-in fallback
+    ACCT.user = { name: username, email: username, provider: 'password' };
+    toast('Signed in as ' + username, true);
+    closeSheet();
+    paintAcctBtn();
+  };
 }
 
 /* ============================================================
@@ -559,7 +596,13 @@ function openAccount() {
    (API keys live in Cloudflare env vars, never in the browser)
    ============================================================ */
 let AI = { checked: false, ok: false, models: {}, passReq: false };
-let aiModel = null, aiNote = null;
+/* shown before the server has answered (or when it can't) so the picker is always visible */
+const AI_FALLBACK_MODELS = {
+  fable: { name: 'Claude Fable 5' }, opus: { name: 'Claude Opus 5' }, grok: { name: 'Grok 4.5' },
+  sol: { name: 'GPT-5.6 Sol' }, terra: { name: 'GPT-5.6 Terra' },
+  geminipro: { name: 'Gemini 2.5 Pro' }, geminiflash: { name: 'Gemini 2.5 Flash' }, gemini2flash: { name: 'Gemini 2.0 Flash' },
+};
+let aiModel = 'geminipro', aiNote = null;
 function aiEndpoint() {
   if (typeof window !== 'undefined' && window.claude) return null; // hosted artifact: platform blocks outside calls
   if (location.protocol === 'file:') {
@@ -577,34 +620,49 @@ async function aiProbe() {
     const j = await r.json();
     AI = { checked: true, ok: !!j.ok, models: j.models || {}, passReq: !!j.passcodeRequired };
     const avail = Object.keys(AI.models).filter(k => AI.models[k].available);
-    if (!aiModel || !avail.includes(aiModel)) aiModel = avail[0] || null;
+    if (avail.length && !avail.includes(aiModel)) aiModel = avail[0];
   } catch { AI = { checked: true, ok: false, models: {}, passReq: false }; }
   if (curView === 'lab') renderLab();
+}
+function aiModelGrid() {
+  const live = AI.ok && Object.keys(AI.models).length > 0;
+  const modelsMap = live ? AI.models : AI_FALLBACK_MODELS;
+  const entries = Object.entries(modelsMap);
+  return `
+    <div class="formrow" style="margin-bottom:12px">
+      <label for="aiModelSelect">Selected AI Model (Dropdown List)</label>
+      <select id="aiModelSelect" style="font-weight:700;font-size:14.5px">
+        ${entries.map(([k, m]) => `<option value="${k}" ${k === aiModel ? 'selected' : ''} ${live && !m.available ? 'disabled' : ''}>${esc(m.name)} — ${esc(AI_MAKER[k] || '')}${live && !m.available ? ' (No Key)' : ''}</option>`).join('')}
+      </select>
+    </div>
+    <div class="sublabel">Or click a model card below</div>
+    <div id="aimodels">${entries.map(([k, m]) =>
+      `<button data-ai="${k}" class="aimodel ${k === aiModel ? 'on' : ''}" ${live && !m.available ? 'disabled' : ''}>
+        ${aiLogo(k)}
+        <span class="aimeta"><b>${esc(m.name)}</b><small>${esc(AI_MAKER[k] || '')}${live && !m.available ? ' · no key yet' : ''}</small></span>
+      </button>`).join('')}</div>`;
 }
 function aiPanelHtml() {
   const ep = aiEndpoint();
   if (!ep && typeof window !== 'undefined' && window.claude) {
     return `<div class="card" style="margin-top:10px"><b>🤖 AI picks live on the website</b><p class="muted small" style="margin:5px 0 0">This hosted copy can't reach outside servers — open your deployed site for AI picks.</p></div>`;
   }
+  let status = '';
   if (!ep) {
-    return `<div class="card" style="margin-top:10px"><b>🤖 Connect to your site once</b>
+    status = `<div class="card" style="margin-top:12px"><b>🤖 Connect to your site once</b>
       <p class="muted small" style="margin:5px 0 8px">Enter your deployed site URL — its server answers AI requests so your API keys stay private.</p>
       <div class="formrow"><label>Site URL</label><input id="aiEpIn" placeholder="https://jackpot-hq.pages.dev" value="${esc(S.aiEndpoint || '')}"></div>
       <div class="formrow"><label>Passcode (only if you set APP_PASSCODE)</label><input id="aiPassIn" placeholder="optional" value="${esc(S.aiPass || '')}"></div>
       <div style="margin-top:12px"><button class="gbtn" id="aiEpSave">Connect</button></div></div>`;
+  } else if (!AI.checked) {
+    status = `<div class="chip" style="margin-top:12px">Checking which models your site has keys for…</div>`;
+  } else if (!AI.ok) {
+    status = `<div class="card" style="margin-top:12px"><b>Site not answering AI requests yet</b><p class="muted small" style="margin:5px 0 0">Couldn't reach ${esc(ep)} — if you just deployed, give it a minute and reopen this tab. Picks will work once the site is live.</p></div>`;
+  } else if (!Object.values(AI.models).some((m) => m.available)) {
+    status = `<div class="card" style="margin-top:12px"><b>Almost there — add your API keys</b>
+      <p class="muted small" style="margin:5px 0 0">In Cloudflare Pages → your project → <b>Settings → Environment variables</b>, add any of: <b>ANTHROPIC_API_KEY</b> (Fable 5 + Opus 5), <b>OPENAI_API_KEY</b> (GPT-5.6 Sol + Terra), <b>XAI_API_KEY</b> (Grok 4.5), or <b>GEMINI_API_KEY</b> (Gemini 2.5 Pro). Redeploy and the models light up automatically.</p></div>`;
   }
-  if (!AI.checked) return `<div class="card" style="margin-top:10px"><span class="muted small">Checking AI availability…</span></div>`;
-  if (!AI.ok) return `<div class="card" style="margin-top:10px"><b>AI endpoint unreachable</b><p class="muted small" style="margin:5px 0 0">Couldn't reach ${esc(ep)}. If you just deployed, give it a minute, then switch tabs and back to retry.</p></div>`;
-  const entries = Object.entries(AI.models);
-  if (!entries.some(([, m]) => m.available)) {
-    return `<div class="card" style="margin-top:10px"><b>Almost there — add your API keys</b>
-      <p class="muted small" style="margin:5px 0 0">In Cloudflare Pages → your project → <b>Settings → Environment variables</b>, add any of: <b>ANTHROPIC_API_KEY</b> (Fable 5 + Opus 5), <b>OPENAI_API_KEY</b> (GPT-5.6 Sol + Terra), <b>XAI_API_KEY</b> (Grok 4.5). Redeploy and the models appear here automatically.</p></div>`;
-  }
-  return `<div class="sublabel">Choose your model</div><div id="aimodels">${entries.map(([k, m]) =>
-    `<button data-ai="${k}" class="aimodel ${k === aiModel ? 'on' : ''}" ${m.available ? '' : 'disabled'}>
-      ${aiLogo(k)}
-      <span class="aimeta"><b>${esc(m.name)}</b><small>${esc(AI_MAKER[k] || '')}${m.available ? '' : ' · no key yet'}</small></span>
-    </button>`).join('')}</div>`;
+  return aiModelGrid() + status;
 }
 function askPasscode() {
   openSheet(`<h3>🔒 Passcode</h3>
@@ -616,8 +674,10 @@ function askPasscode() {
 async function aiGenerate() {
   const G = GAMES[labGame];
   const ep = aiEndpoint();
-  if (!ep || !AI.ok) return toast('AI isn\'t connected here yet');
-  if (!aiModel || !AI.models[aiModel]?.available) return toast('Pick an AI model first');
+  if (!ep) return toast('Connect your deployed site first — see the panel above');
+  if (!AI.ok) return toast('Your site isn\'t answering AI requests yet — deploy it, then reopen this tab');
+  if (!aiModel) return toast('Pick an AI model first');
+  if (!AI.models[aiModel]?.available) return toast((AI_FALLBACK_MODELS[aiModel]?.name || 'That model') + ' has no API key on the server yet');
   const m = $('#machine'); const out = $('#labout'); out.innerHTML = ''; m.classList.add('go');
   const gb = $('#genbtn'); if (gb) { gb.disabled = true; gb.textContent = AI.models[aiModel].name + ' is thinking…'; }
   const recent = (RES[labGame] || []).slice(-15).map(r => G.digits
@@ -802,7 +862,7 @@ function gameCard(g) {
     </div>
     <div class="bottom">
       ${G.infoOnly ? '<span class="nextin muted">every 4 min at the retailer</span>'
-        : `<span class="nextin">Next: <b>${fmtNextShort(nd)}</b>${nd && nd.session ? ' <span class="muted">(' + (nd.session === 'M' ? 'midday' : 'evening') + ')</span>' : ''}</span>`}
+        : `<span class="nextin" data-nextfor="${g}">Next: <b>${fmtNextShort(nd)}</b>${nd && nd.session ? ' <span class="muted">(' + (nd.session === 'M' ? 'midday' : 'evening') + ')</span>' : ''}</span>`}
       ${last && !G.digits && !G.infoOnly ? `<span class="lastmini">${last.n.slice(0, GAMES[g].matrix.pick).map(n => `<span class="ball xs">${n}</span>`).join('')}${last.b != null && !G.matrix?.bullseye ? `<span class="ball xs bonus">${last.b}</span>` : ''}</span>`
         : last && G.digits ? `<span class="lastmini">${[...last.n].map(d => `<span class="ball xs">${d}</span>`).join('')}</span>` : ''}
       ${G.manualResults ? `<button class="obtn" style="padding:4px 10px;font-size:11px" data-addres="${g}" title="Enter last night's result">↻</button>` : ''}
@@ -811,11 +871,14 @@ function gameCard(g) {
 }
 function countUp(el) {
   if (!el || matchMedia('(prefers-reduced-motion: reduce)').matches) return;
-  const target = +el.dataset.amt; const t0 = performance.now(); const dur = 1300;
+  const target = +el.dataset.amt; if (!target) return;
+  const formatted = fmtMoney(target);
+  if (el.textContent === formatted) return;
+  const t0 = performance.now(); const dur = 1000;
   (function tick(t) {
     const p = Math.min(1, (t - t0) / dur); const e = 1 - Math.pow(1 - p, 3);
     el.textContent = fmtMoney(target * e);
-    if (p < 1) requestAnimationFrame(tick); else el.textContent = fmtMoney(target);
+    if (p < 1) requestAnimationFrame(tick); else el.textContent = formatted;
   })(t0);
 }
 function editJackpot(g) {
@@ -839,12 +902,17 @@ function editJackpot(g) {
    RENDER — LAB
    ============================================================ */
 let labGame = 'pb', labStrat = 'smart', labCount = 3, labLines = [], manualSel = [], manualBonus = null;
-const genLabel = () => labStrat === 'ai' ? '✨ Generate with AI' : 'Generate';
+const genLabel = () => {
+  if (labStrat !== 'ai') return 'Generate';
+  const name = (AI.models[aiModel]?.name || AI_FALLBACK_MODELS[aiModel]?.name || 'AI');
+  return `✨ Generate with ${name}`;
+};
 function aiFeatureHtml(on) {
+  const spark = `<span class="af-spark"><svg viewBox="0 0 24 24"><defs><linearGradient id="aisprk" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ff7ad9"/><stop offset=".55" stop-color="#ffffff"/><stop offset="1" stop-color="#9f7aff"/></linearGradient></defs><path fill="url(#aisprk)" d="M10.5 2.5 12.6 9l6.5 2.1-6.5 2.1-2.1 6.5-2.1-6.5-6.5-2.1L8.4 9z"/><path fill="url(#aisprk)" d="M18.8 14.6l1 2.9 2.9 1-2.9 1-1 2.9-1-2.9-2.9-1 2.9-1z"/></svg></span>`;
   return `<button class="aifeature ${on ? 'on' : ''}" data-s="ai">
-    <div class="af-head"><span class="af-spark">✨</span><b>AI Pick</b><span class="af-tag">${on ? 'Selected' : 'Featured'}</span></div>
-    <p>A frontier model studies the real draw history, builds statistically-typical low-crowd lines and explains every pick it makes.</p>
-    <div class="af-makers">${aiLogo('fable')}${aiLogo('sol')}${aiLogo('grok')}<span>Fable 5 · Opus 5 · GPT-5.6 · Grok 4.5 — you choose the brain</span></div>
+    <div class="af-head">${spark}<b>AI Pick</b><span class="af-tag">${on ? 'Active' : 'Select AI'}</span></div>
+    <p>Select your preferred AI brain below — Anthropic Claude, OpenAI GPT, xAI Grok, or Google Gemini analyzes draw trends and generates smart picks with reasoning.</p>
+    <div class="af-makers">${aiLogo('fable')}${aiLogo('sol')}${aiLogo('grok')}${aiLogo('gemini')}<span>Claude Fable 5 · Opus 5 · GPT-5.6 · Grok 4.5 · Gemini 2.5 Pro</span></div>
   </button>`;
 }
 function renderLab() {
@@ -862,7 +930,7 @@ function renderLab() {
   const ctlHtml = labStrat === 'manual' && !G.digits ? manualBoard() : `
   <div id="labctl">
     <div class="stepper"><button id="minus">−</button><b id="lcount">${labCount} line${labCount > 1 ? 's' : ''}</b><button id="plus">+</button></div>
-    <button class="gbtn" id="genbtn" style="flex:1">${genLabel()}</button>
+    <button class="gbtn ${aiOn ? 'aibtn' : ''}" id="genbtn" style="flex:1">${genLabel()}</button>
   </div>`;
   const tailHtml = `<div id="machine"><div class="drum"></div><div class="mb"></div><div class="mb"></div><div class="mb"></div><div class="mb"></div><div class="mb"></div><div class="mb"></div></div>
   <div id="labout"></div>`;
@@ -876,7 +944,8 @@ function renderLab() {
       ? `<div id="aipanel">${aiPanelHtml()}</div>${truthHtml}${ctlHtml}${tailHtml}<div class="sublabel">More ways to pick</div>${gridHtml}`
       : `${gridHtml}${truthHtml}${ctlHtml}${tailHtml}`}`}`;
   $$('.gpick button:not([data-ai])', v).forEach(b => { if (b.dataset.g) b.onclick = () => { labGame = b.dataset.g; labLines = []; aiNote = null; manualSel = []; manualBonus = null; renderLab(); }; });
-  $$('.strat, .aifeature', v).forEach(b => b.onclick = () => { labStrat = b.dataset.s; labLines = []; aiNote = null; renderLab(); });
+  const sel = $('#aiModelSelect');
+  if (sel) sel.onchange = (e) => { aiModel = e.target.value; renderLab(); };
   $$('#aimodels button', v).forEach(b => b.onclick = () => { aiModel = b.dataset.ai; renderLab(); });
   const epSave = $('#aiEpSave');
   if (epSave) epSave.onclick = () => {
@@ -1609,9 +1678,14 @@ function tickCountdowns() {
     const set = (u, v) => { const c = el.querySelector(`[data-u="${u}"]`); if (c && c.textContent != v) c.textContent = v; };
     set('d', p.d); set('h', pad2(p.h)); set('m', pad2(p.m)); set('s', pad2(p.s));
   });
+  $$('[data-nextfor]').forEach(el => {
+    const nd = nextDraws(el.dataset.nextfor, 1)[0]; if (!nd) return;
+    const b = el.querySelector('b');
+    const txt = fmtNextShort(nd);
+    if (b && b.textContent !== txt) b.textContent = txt;
+  });
 }
 setInterval(tickCountdowns, 1000);
-setInterval(() => { if (curView === 'home' && !$('#sheet').classList.contains('on')) renderHome(); }, 30000);
 
 /* ---------- live data (from the hourly cloud job, or the local PC updater) ---------- */
 function applyLiveData(L) {

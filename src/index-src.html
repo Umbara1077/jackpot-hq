@@ -19,6 +19,8 @@
   --mark-gold:#b5872b; --mark-cool:#5e93d8; --mark-mid:#5c665e;
   --ok:#2fa36b; --warn:#b5872b; --bad:#c23a4e;
   --pb:#e0433e; --mm:#4a7bd4; --m4l:#2fa36b; --p6:#8f6bd4; --jc5:#2aa7a0; --p3:#e08a3c; --p4:#d4646c; --pop:#d152a4;
+  /* AI accent — copilot-style pink/white gradient */
+  --aiA:#ff8ad8; --aiB:#ffffff; --aiC:#a5b8ff; --ai-glow:rgba(255,138,216,.25);
   --r:18px; --r-sm:12px;
   --shadow:0 12px 40px rgba(0,0,0,.45), 0 2px 8px rgba(0,0,0,.35);
   --display:'Didot','Bodoni MT','Playfair Display','Georgia Pro',Georgia,'Times New Roman',serif;
@@ -31,6 +33,7 @@
   --ink:#22261f; --ink2:#565e51; --ink3:#89927f;
   --gold:#9c7420; --gold-hi:#7a5a15; --gold-deep:#b98a2b; --gold-glow:rgba(156,116,32,.22);
   --mark-gold:#9c7420; --mark-cool:#3d6fb4; --mark-mid:#9aa192;
+  --aiA:#c93da6; --aiB:#7c4dd4; --aiC:#3d6fb4; --ai-glow:rgba(201,61,166,.18);
   --ok:#1e7d4f; --warn:#95700f; --bad:#b02a3e;
   --shadow:0 10px 30px rgba(70,55,20,.16), 0 2px 6px rgba(70,55,20,.10);
 }
@@ -81,9 +84,9 @@ header{
 @keyframes spin{to{transform:rotate(360deg)}}
 
 /* ============ views & nav ============ */
-.view{display:none; animation:viewin .32s cubic-bezier(.22,.9,.36,1)}
+.view{display:none; animation:viewin .22s ease-out}
 .view.on{display:block}
-@keyframes viewin{from{opacity:0; transform:translateY(10px)} to{opacity:1; transform:none}}
+@keyframes viewin{from{opacity:0} to{opacity:1}}
 nav#tabbar{
   position:fixed; left:50%; transform:translateX(-50%);
   bottom:calc(10px + env(safe-area-inset-bottom)); z-index:50;
@@ -163,16 +166,15 @@ button.obtn.gold{color:var(--gold); border-color:color-mix(in srgb, var(--gold) 
 .ball.bonus{--tint:var(--gold); color:#231703}
 .ball.pbball{--tint:#ff9d99} .ball.mmball{--tint:#ffd76e} .ball.m4lball{--tint:#7fe3ae}
 .ball.dim{opacity:.4; filter:grayscale(.4)}
-.ball.hit{outline:3px solid var(--gold); outline-offset:2px; animation:hitpulse 1.6s ease infinite}
-@keyframes hitpulse{50%{outline-color:color-mix(in srgb, var(--gold) 30%, transparent)}}
+.ball.hit{outline:2.5px solid var(--gold); outline-offset:2px; box-shadow:0 0 14px var(--gold-glow)}
 .ball.sm{--size:30px} .ball.xs{--size:24px; font-weight:700}
 .ballrow{display:flex; gap:7px; align-items:center; flex-wrap:wrap}
-.popin .ball{animation:ballpop .5s cubic-bezier(.34,1.56,.64,1) backwards}
-.popin .ball:nth-child(1){animation-delay:.05s}.popin .ball:nth-child(2){animation-delay:.13s}
-.popin .ball:nth-child(3){animation-delay:.21s}.popin .ball:nth-child(4){animation-delay:.29s}
-.popin .ball:nth-child(5){animation-delay:.37s}.popin .ball:nth-child(6){animation-delay:.45s}
-.popin .ball:nth-child(7){animation-delay:.55s}
-@keyframes ballpop{0%{transform:scale(0) rotate(-40deg); opacity:0} 60%{opacity:1} 100%{transform:scale(1) rotate(0)}}
+.popin .ball{animation:ballpop .22s ease-out backwards}
+.popin .ball:nth-child(1){animation-delay:.02s}.popin .ball:nth-child(2){animation-delay:.05s}
+.popin .ball:nth-child(3){animation-delay:.08s}.popin .ball:nth-child(4){animation-delay:.11s}
+.popin .ball:nth-child(5){animation-delay:.14s}.popin .ball:nth-child(6){animation-delay:.17s}
+.popin .ball:nth-child(7){animation-delay:.20s}
+@keyframes ballpop{from{opacity:0; transform:scale(0.92)} to{opacity:1; transform:scale(1)}}
 
 /* ============ HOME ============ */
 #heroStack{display:flex; flex-direction:column; gap:12px; margin-top:6px}
@@ -246,49 +248,74 @@ button.obtn.gold{color:var(--gold); border-color:color-mix(in srgb, var(--gold) 
 .strat p{margin:5px 0 0; font-size:11px; color:var(--ink3); line-height:1.45}
 .strat.on{border-color:var(--gold-deep); background:linear-gradient(180deg, rgba(232,184,75,.14), var(--card)); box-shadow:0 6px 20px var(--gold-glow)}
 .strat .ico{width:17px;height:17px;color:var(--gold)}
-/* featured AI Pick card — the star of the Lab */
+/* featured AI Pick card — Copilot pink/white/violet gradient */
 .aifeature{
   display:block; width:100%; text-align:left; font:inherit; cursor:pointer; color:var(--ink);
-  position:relative; overflow:hidden; border-radius:17px; padding:16px 17px 15px; margin:2px 0 12px;
-  border:1px solid color-mix(in srgb, var(--gold) 48%, transparent);
+  position:relative; overflow:hidden; border-radius:20px; padding:18px 20px 16px; margin:2px 0 12px;
+  border:1.5px solid rgba(255,138,216,.32);
   background:
-    radial-gradient(120% 150% at 100% -30%, var(--gold-glow), transparent 60%),
-    linear-gradient(135deg, color-mix(in srgb, var(--gold) 15%, transparent), var(--card) 55%);
-  box-shadow:var(--shadow); transition:border-color .18s, box-shadow .18s, transform .12s;
+    radial-gradient(100% 140% at 92% -25%, rgba(255,138,216,.20), transparent 60%),
+    radial-gradient(85% 130% at -5% 115%, rgba(165,184,255,.16), transparent 55%),
+    linear-gradient(135deg, rgba(255,255,255,.05), rgba(255,255,255,.01));
+  box-shadow:0 8px 30px rgba(255,138,216,.14), var(--shadow); backdrop-filter:blur(16px);
+  transition:all .2s ease;
 }
+.aifeature:hover{border-color:rgba(255,138,216,.55); box-shadow:0 10px 36px rgba(255,138,216,.25), var(--shadow)}
 .aifeature:active{transform:scale(.985)}
-.aifeature::after{
-  content:""; position:absolute; top:0; bottom:0; width:55%; left:-70%; pointer-events:none;
-  background:linear-gradient(100deg, transparent, color-mix(in srgb, var(--gold-hi) 14%, transparent) 50%, transparent);
-  transform:skewX(-18deg); animation:aisweep 4.6s ease-in-out infinite;
+.aifeature.on{
+  border-color:#ff8ad8;
+  background:
+    radial-gradient(100% 140% at 92% -25%, rgba(255,138,216,.30), transparent 65%),
+    radial-gradient(85% 130% at -5% 115%, rgba(165,184,255,.22), transparent 60%),
+    linear-gradient(135deg, rgba(255,255,255,.08), rgba(255,255,255,.02));
+  box-shadow:0 0 32px rgba(255,138,216,.35), var(--shadow);
 }
-@keyframes aisweep{0%,55%{left:-70%} 90%,100%{left:130%}}
-.aifeature.on{border-color:var(--gold); box-shadow:0 0 0 1px var(--gold-deep), 0 10px 34px var(--gold-glow)}
 .af-head{display:flex; align-items:center; gap:9px}
-.af-head b{font-family:var(--display); font-size:20px; letter-spacing:.02em}
-.af-spark{font-size:18px; filter:drop-shadow(0 0 9px var(--gold-glow))}
+.af-head b{
+  font-family:var(--display); font-size:22px; font-weight:700; letter-spacing:-.01em;
+  background:linear-gradient(120deg, #ff8ad8 0%, #ffffff 45%, #b06ef7 80%, #7aa2ff 100%);
+  -webkit-background-clip:text; background-clip:text; color:transparent;
+}
+.af-spark svg{width:22px; height:22px; display:block}
 .af-tag{
-  margin-left:auto; font-size:9.5px; font-weight:800; letter-spacing:.14em; text-transform:uppercase;
-  color:var(--gold); border:1px solid color-mix(in srgb, var(--gold) 50%, transparent);
-  border-radius:99px; padding:4px 10px; background:color-mix(in srgb, var(--gold) 10%, transparent);
+  margin-left:auto; font-size:10px; font-weight:800; letter-spacing:.12em; text-transform:uppercase;
+  color:#ffffff; border:1px solid rgba(255,138,216,.6);
+  border-radius:99px; padding:4px 12px;
+  background:linear-gradient(135deg, rgba(255,138,216,.3), rgba(176,110,247,.3));
+  box-shadow:0 2px 10px rgba(255,138,216,.2);
 }
-.aifeature p{margin:7px 0 0; font-size:12.5px; color:var(--ink2); line-height:1.5; max-width:56ch}
-.af-makers{display:flex; align-items:center; gap:6px; margin-top:12px; flex-wrap:wrap}
+.aifeature p{margin:8px 0 0; font-size:13px; color:var(--ink2); line-height:1.5; max-width:58ch}
+/* AI-mode generate button takes Copilot pink gradient */
+button.gbtn.aibtn{
+  color:#ffffff; font-weight:800; letter-spacing:.04em;
+  background:linear-gradient(135deg, #ff65c5 0%, #d852f5 45%, #7a70ff 100%);
+  border:1px solid rgba(255,255,255,.4);
+  box-shadow:0 8px 26px rgba(255,101,197,.38), inset 0 1px 1px rgba(255,255,255,.6);
+  transition:all .2s ease;
+}
+button.gbtn.aibtn:hover{transform:translateY(-1px); box-shadow:0 12px 32px rgba(255,101,197,.5), inset 0 1px 1px rgba(255,255,255,.8)}
+:root[data-theme="light"] button.gbtn.aibtn{color:#fff}
+.af-makers{display:flex; align-items:center; gap:8px; margin-top:14px; flex-wrap:wrap}
 .af-makers .ailogo{display:block}
-.af-makers .ailogo svg{width:24px; height:24px; display:block; border-radius:7px; box-shadow:0 2px 6px rgba(0,0,0,.35)}
-.af-makers > span{font-size:11px; color:var(--ink3); font-weight:600; margin-left:3px}
-.sublabel{font-size:11px; letter-spacing:.15em; text-transform:uppercase; color:var(--ink3); font-weight:700; margin:16px 2px 8px}
-#aimodels{display:grid; grid-template-columns:repeat(auto-fill,minmax(215px,1fr)); gap:9px; margin-top:2px}
+.af-makers .ailogo svg{width:26px; height:26px; display:block; border-radius:8px; box-shadow:0 3px 8px rgba(0,0,0,.35)}
+.af-makers > span{font-size:11.5px; color:var(--ink3); font-weight:600; margin-left:2px}
+.sublabel{font-size:11.5px; letter-spacing:.15em; text-transform:uppercase; color:var(--ink3); font-weight:700; margin:16px 2px 8px}
+#aimodels{display:grid; grid-template-columns:repeat(auto-fill,minmax(215px,1fr)); gap:10px; margin-top:4px}
 .aimodel{
-  display:flex; align-items:center; gap:11px; font:inherit; text-align:left; cursor:pointer; color:var(--ink);
-  background:var(--card); border:1px solid var(--card-edge); border-radius:14px; padding:10px 12px; transition:all .15s;
+  display:flex; align-items:center; gap:12px; font:inherit; text-align:left; cursor:pointer; color:var(--ink);
+  background:rgba(255,255,255,.03); border:1.5px solid var(--card-edge); border-radius:16px; padding:12px 14px; transition:all .18s ease; backdrop-filter:blur(8px);
 }
+.aimodel:hover:not(:disabled){border-color:rgba(255,138,216,.45); background:rgba(255,255,255,.06)}
 .aimodel:disabled{opacity:.4; cursor:default}
-.aimodel.on{border-color:var(--gold-deep); box-shadow:0 0 0 1px var(--gold-deep), 0 6px 18px var(--gold-glow); transform:translateY(-1px)}
-.aimodel .ailogo svg{width:38px; height:38px; display:block; border-radius:10px; box-shadow:0 3px 8px rgba(0,0,0,.35)}
+.aimodel.on{
+  border-color:#ff8ad8;
+  background:linear-gradient(135deg, rgba(255,138,216,.18), rgba(176,110,247,.08));
+  box-shadow:0 0 0 1px #ff8ad8, 0 8px 24px rgba(255,138,216,.28); transform:translateY(-1px);
+}
+.aimodel .ailogo svg{width:40px; height:40px; display:block; border-radius:11px; box-shadow:0 4px 12px rgba(0,0,0,.4); flex:none}
 .aimodel .aimeta{display:flex; flex-direction:column; line-height:1.25}
-.aimodel .aimeta b{font-size:13.5px}
-.aimodel .aimeta small{font-size:10.5px; color:var(--ink3); letter-spacing:.04em}
+.aimodel .aimeta b{font-size:14px; font-weight:700; color:var(--ink)}
+.aimodel .aimeta small{font-size:11px; color:var(--ink2); margin-top:2px}
 .authbtn{
   display:flex; align-items:center; justify-content:center; gap:10px; width:100%; font:inherit; font-weight:700; font-size:14.5px;
   border-radius:13px; padding:13px; cursor:pointer; margin-top:10px; border:1px solid transparent; transition:transform .12s;
@@ -515,12 +542,73 @@ details.rt p{color:var(--ink2); font-size:13px; margin:9px 0 2px; line-height:1.
   #view-budget.on > .card:has(#ring){grid-column:1; grid-row:2 / span 20; position:sticky; top:86px}
   #view-budget.on > .footnote{grid-column:1/-1}
 }
-@media (prefers-reduced-motion: reduce){
-  *,*::before,*::after{animation-duration:.001s !important; transition-duration:.001s !important}
+/* ============ GRAPHICAL LOGIN GATE ============ */
+.login-gate {
+  position: fixed; inset: 0; z-index: 100; display: none; place-items: center; padding: 20px;
+  background: radial-gradient(circle at 50% 20%, rgba(255, 138, 216, 0.28), transparent 70%),
+              radial-gradient(circle at 80% 80%, rgba(165, 184, 255, 0.22), transparent 60%),
+              linear-gradient(180deg, #090e0b, #0c1310);
+  backdrop-filter: blur(24px);
 }
+.login-gate.on { display: grid; }
+.login-card {
+  width: min(440px, 100%); padding: 32px 28px; border-radius: 26px;
+  background: rgba(22, 34, 28, 0.88); border: 1.5px solid rgba(255, 138, 216, 0.35);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6), 0 0 40px rgba(255, 138, 216, 0.2);
+  backdrop-filter: blur(20px); text-align: center; position: relative; overflow: hidden;
+}
+.login-brand { display: flex; flex-direction: column; align-items: center; gap: 8px; margin-bottom: 16px; }
+.login-logo-ring {
+  width: 58px; height: 58px; border-radius: 50%; display: grid; place-items: center;
+  font-family: var(--display); font-size: 32px; font-weight: 800; color: #1a1207;
+  background: radial-gradient(circle at 38% 30%, #f7e6b0, #e8b84b 55%, #926d1d);
+  box-shadow: 0 6px 20px rgba(232, 184, 75, 0.4), inset 0 2px 4px rgba(255, 255, 255, 0.6);
+}
+.login-brand h2 { font-family: var(--display); font-size: 30px; font-weight: 700; margin: 0; color: var(--ink); letter-spacing: 0.5px; }
+.login-brand h2 em { font-style: italic; color: var(--gold); }
+.login-badge { font-size: 10px; font-weight: 800; letter-spacing: 0.2em; text-transform: uppercase; color: #ff8ad8; background: rgba(255, 138, 216, 0.15); border: 1px solid rgba(255, 138, 216, 0.4); padding: 4px 12px; border-radius: 99px; }
+.login-desc { font-size: 13.5px; color: var(--ink2); line-height: 1.5; margin: 0 0 20px; }
+.login-card .formrow { text-align: left; margin-top: 14px; }
+.login-card .formrow label { font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--ink3); font-weight: 700; margin-bottom: 6px; display: block; }
+.login-card input {
+  font-size: 15px; font-weight: 600; padding: 13px 15px; border-radius: 14px;
+  background: rgba(12, 19, 16, 0.85); border: 1px solid rgba(232, 184, 75, 0.25); color: var(--ink);
+  transition: all 0.18s ease; outline: none; width: 100%;
+}
+.login-card input:focus { border-color: #ff8ad8; box-shadow: 0 0 0 3px rgba(255, 138, 216, 0.25); }
+.login-btn { margin-top: 22px; width: 100%; font-size: 15px; font-weight: 800; padding: 15px; border-radius: 16px; cursor: pointer; }
+.login-hint { margin-top: 20px; padding: 12px 14px; border-radius: 14px; background: rgba(0, 0, 0, 0.3); border: 1px dashed rgba(232, 184, 75, 0.25); font-size: 11.5px; color: var(--ink2); text-align: left; }
+.login-hint b { color: var(--gold); display: block; margin-bottom: 3px; }
+.login-hint p { margin: 0; line-height: 1.4; }
 </style>
 </head>
 <body>
+
+<div id="loginGate" class="login-gate">
+  <div class="login-card">
+    <div class="login-brand">
+      <div class="login-logo-ring">$</div>
+      <h2>Jackpot <em>HQ</em></h2>
+      <span class="login-badge">AI Assistant & Lab</span>
+    </div>
+    <p class="login-desc">Sign in with your username & password to enter Jackpot HQ.</p>
+    <form id="loginGateForm" onsubmit="return false;">
+      <div class="formrow">
+        <label for="gateUser">Username</label>
+        <input id="gateUser" type="text" placeholder="admin" value="admin" autocomplete="username" required>
+      </div>
+      <div class="formrow">
+        <label for="gatePass">Password</label>
+        <input id="gatePass" type="password" placeholder="••••••••" value="password" autocomplete="current-password" required>
+      </div>
+      <button type="submit" class="gbtn aibtn login-btn" id="btnGateSubmit">Sign In to Jackpot HQ</button>
+    </form>
+    <div class="login-hint">
+      <b>⚡ Dev / Local Mode</b>
+      <p>Click <b>Sign In</b> with default username <code>admin</code> and password <code>password</code> (or enter any credentials to test).</p>
+    </div>
+  </div>
+</div>
 <div id="app">
   <header>
     <div class="brand">
