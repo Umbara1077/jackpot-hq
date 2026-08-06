@@ -8,7 +8,7 @@ Your NJ Lottery tracker & number lab. Built Aug 5, 2026.
   & Millionaire for Life results when online).
 - **Phone:** open your private artifact at
   https://claude.ai/code/artifact/49051ebc-c66d-49f5-abc1-dc28ac61a916
-  (sign in to claude.ai → it's also under claude.ai/code/artifacts).
+  (sign in to claude.ai → it's also under claude.ai/code/artifacts).t
 
 ## What's what
 
