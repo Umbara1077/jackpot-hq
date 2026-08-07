@@ -576,9 +576,10 @@ details.rt p{color:var(--ink2); font-size:13px; margin:9px 0 2px; line-height:1.
   #view-lab.on.aimode > #labctl{grid-row:6}
   #view-lab.on.aimode > .sublabel{grid-column:1; grid-row:7}
   #view-lab.on.aimode > .stratgrid{grid-row:8}
-  /* tickets: two columns of cards */
-  #view-tickets.on{display:grid; grid-template-columns:1fr 1fr; gap:0 16px; align-items:start}
-  #view-tickets.on > h2.sect, #view-tickets.on > .tfilter, #view-tickets.on > .footnote, #view-tickets.on > .card:not(.ticket){grid-column:1/-1}
+  /* tickets: two masonry-style columns so short cards don't leave dead space */
+  #view-tickets.on{column-count:2; column-gap:16px}
+  #view-tickets.on > h2.sect, #view-tickets.on > .tfilter, #view-tickets.on > .footnote, #view-tickets.on > .card:not(.ticket){column-span:all}
+  #view-tickets.on > .ticket{break-inside:avoid; margin:0 0 16px}
   /* stats: charts fill a two-column board */
   #statbody{display:grid; grid-template-columns:1fr 1fr; gap:12px; align-items:start}
   #statbody > .card{margin-top:0 !important}
