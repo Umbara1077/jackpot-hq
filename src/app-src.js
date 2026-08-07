@@ -530,7 +530,7 @@ const AI_MAKER = {
    ACCOUNT + CROSS-DEVICE SYNC — /api/auth/* and /api/sync
    Password login gate; optional Google/Apple; tickets/settings sync.
    ============================================================ */
-let ACCT = { checked: false, user: null, providers: {}, sync: false, lastPush: 0 };
+let ACCT = { checked: false, user: null, providers: {}, sync: false, syncBackend: null, lastPush: 0 };
 let syncT = null;
 const LOCAL_SESS_KEY = 'jhq_local_sess';
 const onWeb = () => location.protocol !== 'file:' && !(typeof window !== 'undefined' && window.claude);
@@ -586,7 +586,7 @@ async function doLogin(username, password, fromGate) {
   if (username === 'admin' && password === 'admin') {
     const user = { name: 'admin', email: 'admin', provider: 'password' };
     setLocalSession(user);
-    ACCT = { ...ACCT, checked: true, user, providers: { password: true }, sync: false };
+    ACCT = { ...ACCT, checked: true, user, providers: { password: true }, sync: false, syncBackend: null };
     toast('Signed in as admin', true);
     showLoginGate(false);
     if (!fromGate) closeSheet();
@@ -599,7 +599,7 @@ async function authProbe() {
   wireLoginGate();
   const local = localSession();
   if (!onWeb()) {
-    ACCT = { checked: true, user: local, providers: { password: true }, sync: false, lastPush: 0 };
+    ACCT = { checked: true, user: local, providers: { password: true }, sync: false, syncBackend: null, lastPush: 0 };
     paintAcctBtn();
     showLoginGate(!ACCT.user);
     return;
@@ -608,10 +608,10 @@ async function authProbe() {
     const r = await fetch('api/auth/me', { cache: 'no-store' });
     if (!r.ok) throw new Error('auth unavailable');
     const j = await r.json();
-    ACCT = { checked: true, user: j.user || local, providers: j.providers || { password: true }, sync: !!j.sync, lastPush: 0 };
+    ACCT = { checked: true, user: j.user || local, providers: j.providers || { password: true }, sync: !!j.sync, syncBackend: j.syncBackend || null, lastPush: 0 };
     if (ACCT.user && ACCT.sync) await syncPull();
   } catch {
-    ACCT = { checked: true, user: local, providers: { password: true }, sync: false, lastPush: 0 };
+    ACCT = { checked: true, user: local, providers: { password: true }, sync: false, syncBackend: null, lastPush: 0 };
   }
   paintAcctBtn();
   showLoginGate(!ACCT.user);
@@ -674,8 +674,10 @@ function openAccount() {
     openSheet(`<h3>👤 Account: ${esc(ACCT.user.name || 'Signed In')}</h3>
       <p class="muted small">Signed in as <b>${esc(ACCT.user.name)}</b></p>
       <div class="card" style="margin-top:12px">
-        <b>${ACCT.sync ? '🔄 Account Sync Active' : 'Account Status: Active'}</b>
-        <p class="muted small" style="margin:5px 0 0">Your session is active. Tickets and settings stay saved securely.</p>
+        <b>${ACCT.sync ? (ACCT.syncBackend === 'd1' ? '☁ Cloud database active' : '🔄 Account Sync Active') : 'Account Status: Active'}</b>
+        <p class="muted small" style="margin:5px 0 0">${ACCT.sync
+          ? 'Tickets, budget, and settings sync to your Cloudflare database when you save. Spend &amp; won still track from your tickets + draw results.'
+          : 'Signed in on this device only. Cloud database isn\'t bound yet — tickets stay in this browser (JSON backup still works).'}</p>
         ${ACCT.sync ? '<div class="rowflex" style="margin-top:10px"><button class="obtn gold" id="syncNow">Sync now</button></div>' : ''}
       </div>
       ${DISK.on ? `<div class="card" style="margin-top:12px">

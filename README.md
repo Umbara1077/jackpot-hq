@@ -22,7 +22,8 @@ Your NJ Lottery tracker & number lab. Built Aug 5, 2026.
 | `src/build.js` | Bundles everything into one portable file + the artifact variant |
 | `functions/api/ai-pick.js` | Cloudflare Pages Function that answers AI Pick requests |
 | `functions/api/auth/[action].js` | Sign in with Google / Apple (OAuth) |
-| `functions/api/sync.js` | Cross-device sync blob for signed-in users (KV) |
+| `functions/api/sync.js` | Cross-device sync blob for signed-in users (D1, KV fallback) |
+| `migrations/` | D1 schema (`user_state` table) |
 | `functions/_session.js` | Shared signed-cookie session helpers |
 | `worker/index.js` + `wrangler.jsonc` | Makes Cloudflare run the API (see “Why variables were blocked”) |
 | `scripts/serve.mjs` | Local server + the on-disk ticket store (`/api/store`) |
@@ -86,9 +87,31 @@ is roughly $0.01–0.05 (Grok/Terra/Opus) up to ~$0.10 (Fable 5).
 The full-screen login gate appears until you sign in. Locally use **`admin` / `admin`**.
 On Cloudflare Pages set **`APP_USER`** and **`APP_PASSWORD`**. Sessions are signed HttpOnly
 cookies (`functions/api/auth/[action].js`). Signed-in users skip the AI passcode, and with the
-KV binding below their tickets/budget/settings follow them via `functions/api/sync.js`.
+D1 (or legacy KV) binding below their tickets/budget/settings follow them via
+`functions/api/sync.js`.
 
-## Optional: Sign in with Google (+ Apple) & cross-device sync
+## Cloud database (D1) — tickets that follow you
+
+Today tickets live in **localStorage** on the phone/browser, plus optional **JSON backup**
+and (on PC via `Jackpot HQ.cmd`) a **disk file**. Spend / won are calculated from those
+tickets + draw results — they are not a separate ledger.
+
+To keep the same tickets and budget across devices on Cloudflare, use **D1** (SQLite):
+
+1. `npx wrangler login`
+2. `npx wrangler d1 create jackpot-hq` — copy the `database_id`
+3. In `wrangler.jsonc`, uncomment `d1_databases` and paste that id
+4. `npx wrangler d1 migrations apply jackpot-hq --remote`
+5. Deploy when you are ready (`npx wrangler deploy`) — **do not deploy until you ask to**
+
+After deploy + sign-in, Account shows **Cloud database active**. Saves push to D1;
+opening on another device pulls and merges tickets by id. JSON backup remains a good
+offline spare.
+
+Legacy option: a KV namespace bound as `USERS` still works if D1 is not set up.
+`/api/sync` prefers D1 when both exist.
+
+## Optional: Sign in with Google (+ Apple)
 
 One-time Google setup (~5 minutes, free):
 
@@ -99,10 +122,6 @@ One-time Google setup (~5 minutes, free):
    - Authorized redirect URI: `https://YOUR-SITE.pages.dev/api/auth/google-cb`
      (add one per domain if you also use a custom domain)
 4. Copy the **Client ID** and **Client secret** into the env vars below.
-
-Sync storage (optional): Cloudflare dashboard → **Workers & Pages → KV → Create namespace**
-(any name), then your Pages project → **Settings → Bindings → Add → KV namespace** with
-variable name `USERS`. Without it, sign-in still works — data just stays per-device.
 
 Apple sign-in also ships (`APPLE_*` vars below) but needs a paid Apple Developer membership —
 skip it unless you already have one.
@@ -132,7 +151,8 @@ Cloudflare Pages → your project → **Settings → Environment variables** (Pr
 | `GOOGLE_CLIENT_ID` + `GOOGLE_CLIENT_SECRET` | Sign in with Google | Google Cloud Console (steps above) |
 | `APPLE_CLIENT_ID`, `APPLE_TEAM_ID`, `APPLE_KEY_ID`, `APPLE_PRIVATE_KEY` | Sign in with Apple (optional) | developer.apple.com (Services ID + .p8 key) |
 
-Plus the KV binding `USERS` (Settings → Bindings) if you want cross-device sync.
+Plus the D1 binding `DB` in `wrangler.jsonc` (see *Cloud database* above) for cross-device
+sync. Legacy KV binding `USERS` still works as a fallback.
 
 ## Live data on this PC
 
@@ -173,7 +193,9 @@ use the `.cmd` if you want tickets on disk.
 
 ## Backup & restore (the web copy — Cloudflare, phone artifact)
 
-Hosted copies keep tickets in that browser's localStorage, so **Budget → 💾 Backup & restore**
+With D1 bound and you signed in, the hosted app syncs tickets to the cloud database
+automatically. JSON backup is still useful as an offline spare. Without D1, hosted
+copies keep tickets in that browser's localStorage only — **Budget → 💾 Backup & restore**
 is how they get out. Three ways to save, three ways back:
 
 | Save a copy | Notes |

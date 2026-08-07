@@ -71,7 +71,8 @@ export async function onRequest(context) {
     return json({
       user: user ? { email: user.email || null, name: user.name || null, provider: user.provider } : null,
       providers: { google: googleReady(env), apple: appleReady(env), password: true },
-      sync: !!env.USERS,
+      sync: !!(env.DB || env.USERS),
+      syncBackend: env.DB ? 'd1' : (env.USERS ? 'kv' : null),
     });
   }
 

@@ -16,9 +16,18 @@
     // /api/* must reach the Worker even if a file of that name ever exists
     "run_worker_first": ["/api/*"]
   },
-  "observability": { "enabled": true }
+  "observability": { "enabled": true },
 
-  // Cross-device sync (optional): create a KV namespace, then uncomment and paste its ID.
-  // Declaring it here is required — `wrangler deploy` replaces dashboard-added bindings.
+  // Cross-device ticket/budget sync via Cloudflare D1 (SQLite).
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "jackpot-hq",
+      "database_id": "8769c66f-211d-42fd-aed7-2ef2aa5cf787",
+      "migrations_dir": "migrations"
+    }
+  ]
+
+  // Legacy KV blob sync (optional fallback if D1 is not bound):
   // "kv_namespaces": [{ "binding": "USERS", "id": "PASTE_KV_NAMESPACE_ID" }]
 }
