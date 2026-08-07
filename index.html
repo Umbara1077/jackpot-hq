@@ -502,18 +502,38 @@ button.gbtn.aibtn:hover{transform:translateY(-1px); box-shadow:0 12px 32px rgba(
 }
 @keyframes pickin{from{opacity:0; transform:translateY(16px) scale(.96)} to{opacity:1; transform:none}}
 .genload{display:flex; flex-direction:column; align-items:center; text-align:center; padding:8px 6px 4px}
+.genload-orb-wrap{
+  width:112px; height:112px; position:relative; margin:4px 0 16px;
+  filter:drop-shadow(0 0 28px rgba(255,101,197,.35)) drop-shadow(0 0 40px rgba(122,112,255,.18));
+}
 .genload-orb{
-  width:112px; height:112px; border-radius:50%; position:relative; margin:4px 0 16px;
-  background:
-    conic-gradient(from 0deg, #ff65c5, #7a70ff, #5dffc8, #ffd56a, #ff65c5);
+  position:absolute; inset:0; border-radius:50%;
+  background:conic-gradient(from 0deg, #ff65c5, #7a70ff, #5dffc8, #ffd56a, #ff65c5);
   animation:orbspin 1.4s linear infinite;
-  box-shadow:0 0 40px rgba(255,101,197,.35), 0 0 60px rgba(122,112,255,.2);
 }
-.genload-orb::after{
-  content:""; position:absolute; inset:6px; border-radius:50%;
-  background:radial-gradient(circle at 35% 30%, rgba(255,255,255,.12), var(--bg2) 70%);
+.genload-orb-core{
+  position:absolute; inset:7px; border-radius:50%; z-index:1;
+  display:grid; place-items:center;
+  background:radial-gradient(circle at 35% 30%, rgba(255,255,255,.16), var(--bg2) 72%);
+  border:1px solid rgba(255,255,255,.08);
+  box-shadow:inset 0 0 18px rgba(0,0,0,.25);
 }
-:root[data-theme="light"] .genload-orb::after{background:radial-gradient(circle at 35% 30%, #fff, #f7f1ff 70%)}
+:root[data-theme="light"] .genload-orb-core{
+  background:radial-gradient(circle at 35% 30%, #ffffff, #f4edff 72%);
+  border-color:rgba(154,24,116,.1);
+  box-shadow:inset 0 0 14px rgba(90,40,140,.06);
+}
+.genload-orb-core .ailogo{display:block; line-height:0}
+.genload-orb-core .ailogo svg{
+  width:52px; height:52px; display:block; border-radius:14px;
+  box-shadow:0 6px 18px rgba(0,0,0,.35);
+}
+.genload-orb-core .genload-mark{
+  width:52px; height:52px; border-radius:14px; display:grid; place-items:center;
+  font-family:var(--display); font-size:26px; font-weight:700; color:#1a1207;
+  background:radial-gradient(circle at 34% 28%, #fff 0 12%, var(--gold) 50%, var(--gold-deep));
+  box-shadow:0 6px 18px rgba(0,0,0,.3);
+}
 @keyframes orbspin{to{transform:rotate(360deg)}}
 .genload b{
   font-family:var(--display); font-size:20px; margin:0 0 6px;
@@ -1715,7 +1735,7 @@ async function aiGenerate() {
   if (!AI.models[aiModel]?.available) return toast(aiModelName(aiModel) + ' is unavailable');
   const name = aiModelName(aiModel);
   const gb = $('#genbtn'); if (gb) { gb.disabled = true; gb.textContent = name + ' is thinking…'; }
-  openGenLoading(name + ' is thinking…', 'Reading recent draws and shaping low-crowd lines.');
+  openGenLoading(name + ' is thinking…', 'Reading recent draws and shaping low-crowd lines.', aiModel);
   const recent = (RES[labGame] || []).slice(-15).map(r => G.digits
     ? `${r.d}${r.t ? '/' + r.t : ''}: ${r.n}${r.f ? ' FB' + r.f : ''}`
     : `${r.d}: ${r.n.join(' ')}${r.b != null ? ' +' + r.b : ''}`);
@@ -2841,9 +2861,15 @@ function closePickModal(keepScrim) {
   m.innerHTML = '';
   if (!keepScrim && !$('#sheet').classList.contains('on')) $('#scrim').classList.remove('on');
 }
-function openGenLoading(title, sub) {
+function openGenLoading(title, sub, modelKey) {
+  const mark = modelKey
+    ? aiLogo(modelKey)
+    : `<span class="genload-mark" aria-hidden="true">$</span>`;
   openPickModal(`<div class="genload">
-    <div class="genload-orb" aria-hidden="true"></div>
+    <div class="genload-orb-wrap" aria-hidden="true">
+      <div class="genload-orb"></div>
+      <div class="genload-orb-core">${mark}</div>
+    </div>
     <b>${esc(title)}</b>
     <p>${esc(sub || 'Hang tight — your lines will pop up here.')}</p>
     <div class="genload-dots" aria-hidden="true"><i></i><i></i><i></i></div>

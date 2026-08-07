@@ -868,7 +868,7 @@ async function aiGenerate() {
   if (!AI.models[aiModel]?.available) return toast(aiModelName(aiModel) + ' is unavailable');
   const name = aiModelName(aiModel);
   const gb = $('#genbtn'); if (gb) { gb.disabled = true; gb.textContent = name + ' is thinking…'; }
-  openGenLoading(name + ' is thinking…', 'Reading recent draws and shaping low-crowd lines.');
+  openGenLoading(name + ' is thinking…', 'Reading recent draws and shaping low-crowd lines.', aiModel);
   const recent = (RES[labGame] || []).slice(-15).map(r => G.digits
     ? `${r.d}${r.t ? '/' + r.t : ''}: ${r.n}${r.f ? ' FB' + r.f : ''}`
     : `${r.d}: ${r.n.join(' ')}${r.b != null ? ' +' + r.b : ''}`);
@@ -1994,9 +1994,15 @@ function closePickModal(keepScrim) {
   m.innerHTML = '';
   if (!keepScrim && !$('#sheet').classList.contains('on')) $('#scrim').classList.remove('on');
 }
-function openGenLoading(title, sub) {
+function openGenLoading(title, sub, modelKey) {
+  const mark = modelKey
+    ? aiLogo(modelKey)
+    : `<span class="genload-mark" aria-hidden="true">$</span>`;
   openPickModal(`<div class="genload">
-    <div class="genload-orb" aria-hidden="true"></div>
+    <div class="genload-orb-wrap" aria-hidden="true">
+      <div class="genload-orb"></div>
+      <div class="genload-orb-core">${mark}</div>
+    </div>
     <b>${esc(title)}</b>
     <p>${esc(sub || 'Hang tight — your lines will pop up here.')}</p>
     <div class="genload-dots" aria-hidden="true"><i></i><i></i><i></i></div>
