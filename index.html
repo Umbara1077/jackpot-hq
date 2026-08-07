@@ -1313,7 +1313,8 @@ async function authProbe() {
     if (!r.ok) throw new Error('auth unavailable');
     const j = await r.json();
     ACCT = { checked: true, user: j.user || local, providers: j.providers || { password: true }, sync: !!j.sync, syncBackend: j.syncBackend || null, lastPush: 0 };
-    if (ACCT.user && ACCT.sync) await syncPull();
+    // Pull cloud → merge, then always push local so tickets created before D1 was live get uploaded.
+    if (ACCT.user && ACCT.sync) { await syncPull(); syncPushSoon(true); }
   } catch {
     ACCT = { checked: true, user: local, providers: { password: true }, sync: false, syncBackend: null, lastPush: 0 };
   }
@@ -1357,21 +1358,27 @@ function mergeRemote(remote) {
 async function syncPull() {
   try {
     const r = await fetch('api/sync', { cache: 'no-store' });
-    if (!r.ok) return;
+    if (!r.ok) return false;
     const j = await r.json();
     if (j.state && mergeRemote(j.state)) { save(); applyTheme(); refreshCurrentView(); }
-  } catch { }
+    return true;
+  } catch { return false; }
 }
-function syncPushSoon() {
-  if (!onWeb() || !ACCT.user || !ACCT.sync) return;
+function syncPushSoon(immediate) {
+  if (!onWeb() || !ACCT.user || !ACCT.sync) return Promise.resolve(false);
   clearTimeout(syncT);
-  syncT = setTimeout(async () => {
+  const run = async () => {
     try {
       const payload = syncPayload();
       const r = await fetch('api/sync', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(payload) });
-      if (r.ok) { ACCT.lastPush = Date.now(); S.syncedAt = payload.pushedAt; }
+      if (r.ok) { ACCT.lastPush = Date.now(); S.syncedAt = payload.pushedAt; localStorage.setItem('jhq', JSON.stringify(S)); return true; }
     } catch { }
-  }, 2500);
+    return false;
+  };
+  // after login / Sync now: upload right away so existing tickets land in D1
+  if (immediate) return run();
+  syncT = setTimeout(run, 2500);
+  return Promise.resolve(false);
 }
 function openAccount() {
   if (ACCT.user) {
@@ -1397,7 +1404,11 @@ function openAccount() {
       </div>`}
       <div style="margin-top:14px"><button class="obtn" id="signOut" style="width:100%">Sign out</button></div>`);
     const ab = $('#acctBackup'); if (ab) ab.onclick = openBackup;
-    const sn = $('#syncNow'); if (sn) sn.onclick = async () => { await syncPull(); syncPushSoon(); toast('Synced', true); };
+    const sn = $('#syncNow'); if (sn) sn.onclick = async () => {
+      await syncPull();
+      const ok = await syncPushSoon(true);
+      toast(ok ? 'Synced to cloud' : 'Sync failed — open the Cloudflare URL (not localhost)', !!ok);
+    };
     $('#signOut').onclick = async () => {
       ACCT.user = null;
       setLocalSession(null);
