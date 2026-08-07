@@ -525,6 +525,12 @@ const AI_MAKER = {
   fable: 'Anthropic', opus: 'Anthropic', grok: 'xAI', sol: 'OpenAI', terra: 'OpenAI',
   geminipro: 'Google', geminiflash: 'Google', gemini2flash: 'Google', gemini: 'Google',
 };
+const AI_PROVIDERS = [
+  { id: 'anthropic', name: 'Anthropic', brand: 'Claude', logo: 'fable', models: ['fable', 'opus'] },
+  { id: 'openai', name: 'OpenAI', brand: 'GPT', logo: 'sol', models: ['sol', 'terra'] },
+  { id: 'xai', name: 'xAI', brand: 'Grok', logo: 'grok', models: ['grok'] },
+  { id: 'google', name: 'Google', brand: 'Gemini', logo: 'geminiflash', models: ['geminipro', 'geminiflash', 'gemini2flash'] },
+];
 
 /* ============================================================
    ACCOUNT + CROSS-DEVICE SYNC — /api/auth/* and /api/sync
@@ -785,22 +791,49 @@ async function aiProbe() {
   } catch { AI = { checked: true, ok: false, models: mergeAiModels(null), passReq: false }; }
   if (curView === 'lab') renderLab();
 }
-function aiModelGrid() {
+function aiModelsMap() {
+  return Object.keys(AI.models || {}).length ? AI.models : mergeAiModels(null);
+}
+function aiModelName(key) {
+  return AI.models[key]?.name || AI_FALLBACK_MODELS[key]?.name || key;
+}
+function aiModelTriggerHtml() {
+  const m = aiModelsMap()[aiModel] || { name: aiModelName(aiModel), available: false };
+  const maker = AI_MAKER[aiModel] || '';
+  return `<button type="button" class="aimodel-trigger aimodel" data-ai="${aiModel}" id="aiModelOpen" aria-haspopup="dialog">
+    ${aiLogo(aiModel)}
+    <span class="aimeta"><b class="grad">${esc(m.name)}</b><small>${esc(maker)}${AI.ok && !m.available ? ' · unavailable' : ''} · tap to change</small></span>
+    <span class="aimodel-chev">Models</span>
+  </button>`;
+}
+function openAiModelPicker() {
   const live = AI.ok;
-  const modelsMap = Object.keys(AI.models || {}).length ? AI.models : mergeAiModels(null);
-  const entries = Object.entries(modelsMap);
-  return `
-    <div class="formrow" style="margin-bottom:12px">
-      <label for="aiModelSelect">Model</label>
-      <select id="aiModelSelect" style="font-weight:700;font-size:14.5px">
-        ${entries.map(([k, m]) => `<option value="${k}" ${k === aiModel ? 'selected' : ''} ${live && !m.available ? 'disabled' : ''}>${esc(m.name)}${AI_MAKER[k] ? ' — ' + esc(AI_MAKER[k]) : ''}${live && !m.available ? ' (unavailable)' : ''}</option>`).join('')}
-      </select>
-    </div>
-    <div id="aimodels">${entries.map(([k, m]) =>
-      `<button data-ai="${k}" class="aimodel ${k === aiModel ? 'on' : ''}" ${live && !m.available ? 'disabled' : ''}>
+  const modelsMap = aiModelsMap();
+  const groups = AI_PROVIDERS.map((p) => {
+    const buttons = p.models.map((k) => {
+      const m = modelsMap[k] || { name: aiModelName(k), available: false };
+      return `<button type="button" data-ai="${k}" class="aimodel ${k === aiModel ? 'on' : ''}" ${live && !m.available ? 'disabled' : ''}>
         ${aiLogo(k)}
-        <span class="aimeta"><b>${esc(m.name)}</b><small>${esc(AI_MAKER[k] || '')}</small></span>
-      </button>`).join('')}</div>`;
+        <span class="aimeta"><b class="grad">${esc(m.name)}</b><small>${live && !m.available ? 'Unavailable on this site' : esc(p.brand) + ' · ' + esc(p.name)}</small></span>
+      </button>`;
+    }).join('');
+    return `<div class="aiprov" data-p="${p.id}">
+      <div class="aiprov-head">${aiLogo(p.logo)}<b>${esc(p.name)}</b><span>${esc(p.brand)}</span></div>
+      ${buttons}
+    </div>`;
+  }).join('');
+  openSheet(`<h3>✨ Choose AI model</h3>
+    <p class="muted small" style="margin:4px 0 0">Pick a maker, then the specific model. Gradients match each lab.</p>
+    ${groups}`);
+  $$('#sheet .aimodel').forEach((b) => {
+    b.onclick = () => {
+      if (b.disabled) return;
+      aiModel = b.dataset.ai;
+      closeSheet();
+      renderLab();
+      toast('Using ' + aiModelName(aiModel), true);
+    };
+  });
 }
 function aiPanelHtml() {
   const ep = aiEndpoint();
@@ -818,7 +851,7 @@ function aiPanelHtml() {
   } else if (!AI.ok) {
     status = `<div class="chip" style="margin-top:12px">AI endpoint unreachable</div>`;
   }
-  return aiModelGrid() + status;
+  return `<div style="margin-top:4px">${aiModelTriggerHtml()}</div>${status}`;
 }
 function askPasscode() {
   openSheet(`<h3>Passcode</h3>
@@ -832,9 +865,10 @@ async function aiGenerate() {
   if (!ep) return toast('Connect a site URL first');
   if (!AI.ok) return toast('AI endpoint unreachable');
   if (!aiModel) return toast('Pick a model');
-  if (!AI.models[aiModel]?.available) return toast((AI_FALLBACK_MODELS[aiModel]?.name || 'That model') + ' is unavailable');
-  const m = $('#machine'); const out = $('#labout'); out.innerHTML = ''; m.classList.add('go');
-  const gb = $('#genbtn'); if (gb) { gb.disabled = true; gb.textContent = AI.models[aiModel].name + ' is thinking…'; }
+  if (!AI.models[aiModel]?.available) return toast(aiModelName(aiModel) + ' is unavailable');
+  const name = aiModelName(aiModel);
+  const gb = $('#genbtn'); if (gb) { gb.disabled = true; gb.textContent = name + ' is thinking…'; }
+  openGenLoading(name + ' is thinking…', 'Reading recent draws and shaping low-crowd lines.');
   const recent = (RES[labGame] || []).slice(-15).map(r => G.digits
     ? `${r.d}${r.t ? '/' + r.t : ''}: ${r.n}${r.f ? ' FB' + r.f : ''}`
     : `${r.d}: ${r.n.join(' ')}${r.b != null ? ' +' + r.b : ''}`);
@@ -855,17 +889,18 @@ async function aiGenerate() {
       signal: ctrl.signal,
     });
     const j = await r.json().catch(() => ({ error: 'bad response from endpoint' }));
-    if (r.status === 401) { askPasscode(); return; }
-    if (!r.ok || !j.ok) { toast(j.error || 'AI error ' + r.status); return; }
+    if (r.status === 401) { closePickModal(); askPasscode(); return; }
+    if (!r.ok || !j.ok) { closePickModal(); toast(j.error || 'AI error ' + r.status); return; }
     labLines = j.lines.map(L => G.digits
       ? ({ n: L.numbers.join(''), why: L.why })
       : ({ n: L.numbers, b: (G.matrix.bonusMax && !G.matrix.bullseye) ? L.bonus : null, why: L.why }));
     aiNote = j.note ? `${j.model} — ${j.note}` : j.model;
-    paintLines();
+    paintLines({ popup: true });
   } catch (e) {
+    closePickModal();
     toast(e.name === 'AbortError' ? 'The AI took too long — try again' : 'AI request failed — check connection');
   } finally {
-    clearTimeout(timer); m.classList.remove('go');
+    clearTimeout(timer);
     const b = $('#genbtn'); if (b) { b.disabled = false; b.textContent = genLabel(); }
   }
 }
@@ -1084,8 +1119,8 @@ function aiFeatureHtml(on) {
   const spark = `<span class="af-spark"><svg viewBox="0 0 24 24"><defs><linearGradient id="aisprk" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ff7ad9"/><stop offset=".55" stop-color="#ffffff"/><stop offset="1" stop-color="#9f7aff"/></linearGradient></defs><path fill="url(#aisprk)" d="M10.5 2.5 12.6 9l6.5 2.1-6.5 2.1-2.1 6.5-2.1-6.5-6.5-2.1L8.4 9z"/><path fill="url(#aisprk)" d="M18.8 14.6l1 2.9 2.9 1-2.9 1-1 2.9-1-2.9-2.9-1 2.9-1z"/></svg></span>`;
   return `<button class="aifeature ${on ? 'on' : ''}" data-s="ai">
     <div class="af-head">${spark}<b>AI Pick</b><span class="af-tag">${on ? 'Active' : 'Select AI'}</span></div>
-    <p>Select your preferred AI brain below — Anthropic Claude, OpenAI GPT, xAI Grok, or Google Gemini analyzes draw trends and generates smart picks with reasoning.</p>
-    <div class="af-makers">${aiLogo('fable')}${aiLogo('sol')}${aiLogo('grok')}${aiLogo('geminiflash')}<span>Claude Fable 5 · Opus 5 · GPT-5.6 · Grok 4.5 · Gemini 3.6 Flash</span></div>
+    <p>Tap Models to open Claude, GPT, Grok, or Gemini — picks and the thinking spinner open in a popup so the Lab stays put.</p>
+    <div class="af-makers">${aiLogo('fable')}${aiLogo('sol')}${aiLogo('grok')}${aiLogo('geminiflash')}<span>Claude · GPT-5.6 · Grok · Gemini</span></div>
   </button>`;
 }
 function renderLab() {
@@ -1105,8 +1140,6 @@ function renderLab() {
     <div class="stepper"><button id="minus">−</button><b id="lcount">${labCount} line${labCount > 1 ? 's' : ''}</b><button id="plus">+</button></div>
     <button class="gbtn ${aiOn ? 'aibtn' : ''}" id="genbtn" style="flex:1">${genLabel()}</button>
   </div>`;
-  const tailHtml = `<div id="machine"><div class="drum"></div><div class="mb"></div><div class="mb"></div><div class="mb"></div><div class="mb"></div><div class="mb"></div><div class="mb"></div></div>
-  <div id="labout"></div>`;
   v.innerHTML = `
   <h2 class="sect">Number Lab <small>strategy picks</small></h2>
   <div class="gpick">${GAME_IDS.map(g => `<button data-g="${g}" class="${g === labGame ? 'on' : ''}">${badge(g, 'sm')}${GAMES[g].short}</button>`).join('')}</div>
@@ -1114,8 +1147,8 @@ function renderLab() {
     <div style="margin-top:12px"><button class="gbtn" id="popgen">Pop me a number</button></div><div id="popout" style="text-align:center;margin-top:14px"></div></div>`
     : `${hasAI ? aiFeatureHtml(aiOn) : ''}
   ${aiOn
-      ? `<div id="aipanel">${aiPanelHtml()}</div>${truthHtml}${ctlHtml}${tailHtml}<div class="sublabel">More ways to pick</div>${gridHtml}`
-      : `${gridHtml}${truthHtml}${ctlHtml}${tailHtml}`}`}`;
+      ? `<div id="aipanel">${aiPanelHtml()}</div>${truthHtml}${ctlHtml}<div class="sublabel">More ways to pick</div>${gridHtml}`
+      : `${gridHtml}${truthHtml}${ctlHtml}`}`}`;
   $$('.gpick button:not([data-ai])', v).forEach(b => { if (b.dataset.g) b.onclick = () => { labGame = b.dataset.g; labLines = []; aiNote = null; manualSel = []; manualBonus = null; renderLab(); }; });
   // Strategy tiles + featured AI Pick button (data-s) — without this the AI panel never opens
   $$('[data-s]', v).forEach(b => {
@@ -1130,9 +1163,8 @@ function renderLab() {
       if (labStrat === 'ai' && !AI.checked) aiProbe();
     };
   });
-  const sel = $('#aiModelSelect');
-  if (sel) sel.onchange = (e) => { aiModel = e.target.value; renderLab(); };
-  $$('#aimodels button', v).forEach(b => b.onclick = () => { aiModel = b.dataset.ai; renderLab(); });
+  const modelOpen = $('#aiModelOpen');
+  if (modelOpen) modelOpen.onclick = openAiModelPicker;
   const epSave = $('#aiEpSave');
   if (epSave) epSave.onclick = () => {
     S.aiEndpoint = $('#aiEpIn').value.trim(); S.aiPass = $('#aiPassIn').value.trim(); save();
@@ -1143,32 +1175,31 @@ function renderLab() {
   const minus = $('#minus'); if (minus) minus.onclick = () => { labCount = Math.max(1, labCount - 1); $('#lcount').textContent = labCount + ' line' + (labCount > 1 ? 's' : ''); };
   const plus = $('#plus'); if (plus) plus.onclick = () => { labCount = Math.min(10, labCount + 1); $('#lcount').textContent = labCount + ' line' + (labCount > 1 ? 's' : ''); };
   const genbtn = $('#genbtn'); if (genbtn) genbtn.onclick = generate;
-  if (labLines.length) paintLines();
 }
 function generate() {
   if (labStrat === 'ai') return aiGenerate();
   const G = GAMES[labGame];
   aiNote = null;
-  const m = $('#machine'); const out = $('#labout'); out.innerHTML = ''; m.classList.add('go');
-  $('#genbtn').disabled = true;
+  const gb = $('#genbtn'); if (gb) gb.disabled = true;
+  openGenLoading('Drawing numbers…', 'Spinning up your ' + (STRATS[labStrat]?.name || 'strategy') + ' lines.');
   setTimeout(() => {
-    m.classList.remove('go'); $('#genbtn').disabled = false;
+    if (gb) gb.disabled = false;
     labLines = [];
     for (let i = 0; i < labCount; i++) {
       if (G.digits) labLines.push({ n: digitGen(labGame, labStrat) });
       else labLines.push(STRATS[labStrat].gen(labGame));
     }
-    paintLines();
-  }, matchMedia('(prefers-reduced-motion: reduce)').matches ? 30 : 950);
+    paintLines({ popup: true });
+  }, matchMedia('(prefers-reduced-motion: reduce)').matches ? 30 : 900);
 }
 function lineBalls(g, line, cls) {
   const G = GAMES[g];
   if (G.digits) return `<div class="digitrow">${[...line.n].map(d => `<div class="digit">${d}</div>`).join('')}</div>`;
   return `<div class="ballrow ${cls || ''}">${line.n.map(n => `<span class="ball ${line.hits?.includes(n) ? 'hit' : ''}">${n}</span>`).join('')}${line.b != null ? `<span class="ball bonus ${line.bHit ? 'hit' : ''}">${line.b}</span>` : ''}</div>`;
 }
-function paintLines() {
-  const G = GAMES[labGame]; const out = $('#labout');
-  out.innerHTML = labLines.map((L, i) => {
+function linesResultHtml() {
+  const G = GAMES[labGame];
+  return labLines.map((L) => {
     const cs = !G.digits && G.matrix.pick > 1 ? crowdScore(labGame, L.n) : null;
     const sum = G.digits ? [...L.n].reduce((a, c) => a + +c, 0) : L.n.reduce((a, b) => a + b, 0);
     return `<div class="line">${lineBalls(labGame, L, 'popin')}
@@ -1185,12 +1216,32 @@ function paintLines() {
     <button class="obtn" id="regen">↻ Again</button>
   </div>
   ${!G.digits && G.matrix.pick > 1 ? `<p class="chip truth" style="margin-top:10px">Crowd score estimates how many OTHER people play similar numbers (birthdays, patterns). Lower = a jackpot would split fewer ways. It cannot change your odds of winning.</p>` : ''}`;
-  $('#regen').onclick = generate;
-  $('#copylines').onclick = () => {
+}
+function wireLinesResultActions() {
+  const regen = $('#regen'); if (regen) regen.onclick = generate;
+  const copy = $('#copylines'); if (copy) copy.onclick = () => {
+    const G = GAMES[labGame];
     const txt = labLines.map(L => G.digits ? L.n : L.n.join('-') + (L.b != null ? ' [' + L.b + ']' : '')).join('\n');
     navigator.clipboard?.writeText(txt).then(() => toast('Copied to clipboard', true), () => toast(txt));
   };
-  $('#saveticket').onclick = () => openTicketSave(labGame, labLines.map(L => ({ ...L })));
+  const save = $('#saveticket'); if (save) save.onclick = () => openTicketSave(labGame, labLines.map(L => ({ ...L })));
+}
+function paintLines(opts) {
+  const popup = !opts || opts.popup !== false;
+  const body = linesResultHtml();
+  if (popup) {
+    closePickModal();
+    const title = labStrat === 'ai'
+      ? `<div class="picks-head">${aiLogo(aiModel)}<b>Your AI picks</b></div><p class="muted small" style="margin:0 0 8px">${esc(aiModelName(aiModel))} · ${GAMES[labGame].name}</p>`
+      : `<div class="picks-head"><b>Your picks</b></div><p class="muted small" style="margin:0 0 8px">${esc(STRATS[labStrat]?.name || 'Lab')} · ${GAMES[labGame].name}</p>`;
+    openSheet(title + body);
+    wireLinesResultActions();
+    return;
+  }
+  const out = $('#labout');
+  if (!out) return;
+  out.innerHTML = body;
+  wireLinesResultActions();
 }
 function manualBoard() {
   const M = GAMES[labGame].matrix;
@@ -1919,11 +1970,39 @@ function downloadICS() {
    sheets / toast / confetti / nav
    ============================================================ */
 function openSheet(html) {
+  closePickModal(true);
   $('#sheet').innerHTML = '<div class="grab"></div>' + html;
   $('#scrim').classList.add('on'); $('#sheet').classList.add('on');
 }
-function closeSheet() { $('#scrim').classList.remove('on'); $('#sheet').classList.remove('on'); }
-$('#scrim').addEventListener('click', closeSheet);
+function closeSheet() {
+  $('#sheet').classList.remove('on');
+  if (!$('#pickmodal')?.classList.contains('on')) $('#scrim').classList.remove('on');
+}
+function openPickModal(html) {
+  // loading / centered cards replace any open bottom sheet so the Lab never stacks modals
+  $('#sheet').classList.remove('on');
+  const m = $('#pickmodal'); if (!m) return;
+  m.innerHTML = `<div class="pickmodal-card">${html}</div>`;
+  m.classList.add('on');
+  m.setAttribute('aria-hidden', 'false');
+  $('#scrim').classList.add('on');
+}
+function closePickModal(keepScrim) {
+  const m = $('#pickmodal'); if (!m) return;
+  m.classList.remove('on');
+  m.setAttribute('aria-hidden', 'true');
+  m.innerHTML = '';
+  if (!keepScrim && !$('#sheet').classList.contains('on')) $('#scrim').classList.remove('on');
+}
+function openGenLoading(title, sub) {
+  openPickModal(`<div class="genload">
+    <div class="genload-orb" aria-hidden="true"></div>
+    <b>${esc(title)}</b>
+    <p>${esc(sub || 'Hang tight — your lines will pop up here.')}</p>
+    <div class="genload-dots" aria-hidden="true"><i></i><i></i><i></i></div>
+  </div>`);
+}
+$('#scrim').addEventListener('click', () => { closePickModal(); closeSheet(); });
 function toast(msg, gold) {
   const t = document.createElement('div'); t.className = 'toast' + (gold ? ' gold' : ''); t.textContent = msg;
   $('#toasts').appendChild(t);
