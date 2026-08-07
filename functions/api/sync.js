@@ -8,8 +8,22 @@ const json = (obj, status = 200) =>
 
 const syncReady = (env) => !!(env.DB || env.USERS);
 
+const CREATE_SQL = `CREATE TABLE IF NOT EXISTS user_state (
+  user_sub TEXT PRIMARY KEY NOT NULL,
+  state_json TEXT NOT NULL,
+  updated_at INTEGER NOT NULL
+)`;
+
+let ensured = false;
+async function ensureSchema(env) {
+  if (!env.DB || ensured) return;
+  await env.DB.prepare(CREATE_SQL).run();
+  ensured = true;
+}
+
 async function loadState(env, sub) {
   if (env.DB) {
+    await ensureSchema(env);
     const row = await env.DB.prepare(
       'SELECT state_json FROM user_state WHERE user_sub = ?'
     ).bind(sub).first();
@@ -22,6 +36,7 @@ async function loadState(env, sub) {
 
 async function saveState(env, sub, text) {
   if (env.DB) {
+    await ensureSchema(env);
     await env.DB.prepare(
       `INSERT INTO user_state (user_sub, state_json, updated_at)
        VALUES (?, ?, ?)
@@ -45,6 +60,7 @@ export async function onRequestGet(context) {
     const state = await loadState(env, user.sub);
     return json({ ok: true, state, backend: env.DB ? 'd1' : 'kv' });
   } catch (e) {
+    ensured = false;
     return json({ error: 'read failed', detail: String(e?.message || e) }, 500);
   }
 }
@@ -63,6 +79,7 @@ export async function onRequestPost(context) {
     await saveState(env, user.sub, text);
     return json({ ok: true, savedAt: Date.now(), backend: env.DB ? 'd1' : 'kv' });
   } catch (e) {
+    ensured = false;
     return json({ error: 'write failed', detail: String(e?.message || e) }, 500);
   }
 }

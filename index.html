@@ -1365,20 +1365,21 @@ async function syncPull() {
   } catch { return false; }
 }
 function syncPushSoon(immediate) {
-  if (!onWeb() || !ACCT.user || !ACCT.sync) return Promise.resolve(false);
+  if (!onWeb() || !ACCT.user || !ACCT.sync) return Promise.resolve({ ok: false, err: 'sync off' });
   clearTimeout(syncT);
   const run = async () => {
     try {
       const payload = syncPayload();
       const r = await fetch('api/sync', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(payload) });
-      if (r.ok) { ACCT.lastPush = Date.now(); S.syncedAt = payload.pushedAt; localStorage.setItem('jhq', JSON.stringify(S)); return true; }
-    } catch { }
-    return false;
+      const j = await r.json().catch(() => ({}));
+      if (r.ok) { ACCT.lastPush = Date.now(); S.syncedAt = payload.pushedAt; localStorage.setItem('jhq', JSON.stringify(S)); return { ok: true }; }
+      return { ok: false, err: j.detail || j.error || ('HTTP ' + r.status) };
+    } catch (e) { return { ok: false, err: String(e?.message || e) }; }
   };
   // after login / Sync now: upload right away so existing tickets land in D1
   if (immediate) return run();
-  syncT = setTimeout(run, 2500);
-  return Promise.resolve(false);
+  syncT = setTimeout(() => { run(); }, 2500);
+  return Promise.resolve({ ok: false, err: 'queued' });
 }
 function openAccount() {
   if (ACCT.user) {
@@ -1406,8 +1407,8 @@ function openAccount() {
     const ab = $('#acctBackup'); if (ab) ab.onclick = openBackup;
     const sn = $('#syncNow'); if (sn) sn.onclick = async () => {
       await syncPull();
-      const ok = await syncPushSoon(true);
-      toast(ok ? 'Synced to cloud' : 'Sync failed — open the Cloudflare URL (not localhost)', !!ok);
+      const res = await syncPushSoon(true);
+      toast(res.ok ? 'Synced to cloud' : ('Sync failed: ' + (res.err || 'unknown')), !!res.ok);
     };
     $('#signOut').onclick = async () => {
       ACCT.user = null;
