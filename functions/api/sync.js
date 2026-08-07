@@ -8,11 +8,9 @@ const json = (obj, status = 200) =>
 
 const syncReady = (env) => !!(env.DB || env.USERS);
 
-const CREATE_SQL = `CREATE TABLE IF NOT EXISTS user_state (
-  user_sub TEXT PRIMARY KEY NOT NULL,
-  state_json TEXT NOT NULL,
-  updated_at INTEGER NOT NULL
-);`;
+// MUST be one line: D1 exec() treats each newline as a separate statement.
+const CREATE_SQL =
+  'CREATE TABLE IF NOT EXISTS user_state (user_sub TEXT PRIMARY KEY NOT NULL, state_json TEXT NOT NULL, updated_at INTEGER NOT NULL)';
 
 function errDetail(e) {
   const parts = [e?.message, e?.cause?.message, e?.cause?.cause?.message, e?.toString?.()];
@@ -21,8 +19,8 @@ function errDetail(e) {
 
 async function ensureSchema(env) {
   if (!env.DB) return;
-  if (typeof env.DB.exec === 'function') await env.DB.exec(CREATE_SQL);
-  else await env.DB.prepare(CREATE_SQL.replace(/;$/, '')).run();
+  // prepare() keeps the full statement; exec() is only safe for single-line SQL
+  await env.DB.prepare(CREATE_SQL).run();
 }
 
 async function loadState(env, sub) {
@@ -42,7 +40,6 @@ async function saveState(env, sub, text) {
   if (env.DB) {
     await ensureSchema(env);
     const now = Date.now();
-    // Prefer plain UPDATE/INSERT over ON CONFLICT — fewer D1 edge-case failures
     const existing = await env.DB.prepare(
       'SELECT user_sub FROM user_state WHERE user_sub = ?'
     ).bind(sub).first();
