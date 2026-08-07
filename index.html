@@ -576,10 +576,9 @@ details.rt p{color:var(--ink2); font-size:13px; margin:9px 0 2px; line-height:1.
   #view-lab.on.aimode > #labctl{grid-row:6}
   #view-lab.on.aimode > .sublabel{grid-column:1; grid-row:7}
   #view-lab.on.aimode > .stratgrid{grid-row:8}
-  /* tickets: two masonry-style columns so short cards don't leave dead space */
-  #view-tickets.on{column-count:2; column-gap:16px}
-  #view-tickets.on > h2.sect, #view-tickets.on > .tfilter, #view-tickets.on > .footnote, #view-tickets.on > .card:not(.ticket){column-span:all}
-  #view-tickets.on > .ticket{break-inside:avoid; margin:0 0 16px}
+  /* tickets: two columns of cards */
+  #view-tickets.on{display:grid; grid-template-columns:1fr 1fr; gap:0 16px; align-items:start}
+  #view-tickets.on > h2.sect, #view-tickets.on > .tfilter, #view-tickets.on > .footnote, #view-tickets.on > .card:not(.ticket){grid-column:1/-1}
   /* stats: charts fill a two-column board */
   #statbody{display:grid; grid-template-columns:1fr 1fr; gap:12px; align-items:start}
   #statbody > .card{margin-top:0 !important}
@@ -961,14 +960,72 @@ const DEFAULTS = {
   budget: { limit: 80, manual: [] },
   alerts: { enabled: false, lead: 30, games: { pb: true, mm: true, m4l: true, p6: false, jc5: false, p3: false, p4: false }, jpPB: 500, jpMM: 300 },
   theme: 'auto', lastSync: 0,
+  ticketsAt: 0, backupAt: 0, // last ticket saved / last backup taken — drives the ⚠ backup nudge
 };
 let S;
 try { S = Object.assign({}, DEFAULTS, JSON.parse(localStorage.getItem('jhq') || '{}')); }
 catch { S = { ...DEFAULTS }; }
 S.budget = Object.assign({}, DEFAULTS.budget, S.budget);
 S.alerts = Object.assign({}, DEFAULTS.alerts, S.alerts);
+const FRESH_BROWSER = !localStorage.getItem('jhq'); // nothing local yet → adopt the disk copy wholesale
 let saveT;
-function save() { clearTimeout(saveT); saveT = setTimeout(() => { try { localStorage.setItem('jhq', JSON.stringify(S)); } catch {} try { syncPushSoon(); } catch {} }, 120); }
+function save() { clearTimeout(saveT); saveT = setTimeout(() => { try { localStorage.setItem('jhq', JSON.stringify(S)); } catch {} try { syncPushSoon(); } catch {} try { diskSaveSoon(); } catch {} }, 120); }
+
+/* ---------- disk store — scripts/serve.mjs writes state.json + tickets.csv ----------
+   Runs whenever the app is opened from the local server (Jackpot HQ.cmd), so tickets
+   live in a real file instead of only localStorage. No account or network needed. */
+const DISK = { on: false, file: '', csv: '', t: null, pulled: false, pullDone: false };
+const onLocalServer = () => /^https?:$/.test(location.protocol) && /^(localhost|127\.0\.0\.1|\[::1\])$/.test(location.hostname);
+// Folds a saved copy of the state into the live one without ever dropping a ticket.
+// Shared by the disk store, the backup file restore, and the cloud sync.
+// adoptScalars: also take the saved settings/results (a fresh browser or an explicit restore).
+function mergeState(remote, adoptScalars) {
+  if (!remote) return false;
+  let changed = false;
+  // tickets: union by id, so neither copy can delete a ticket from the other
+  const byId = new Map((S.tickets || []).map(t => [t.id, t]));
+  for (const t of remote.tickets || []) if (t && t.id && !byId.has(t.id)) { byId.set(t.id, t); changed = true; }
+  if (changed) S.tickets = [...byId.values()].sort((a, b) => (b.created || '').localeCompare(a.created || '') || String(b.id).localeCompare(String(a.id)));
+  const seen = new Set((S.budget.manual || []).map(m => JSON.stringify(m)));
+  for (const m of remote.budget?.manual || []) { const k = JSON.stringify(m); if (!seen.has(k)) { S.budget.manual.push(m); seen.add(k); changed = true; } }
+  for (const [g, j] of Object.entries(remote.jackpots || {})) {
+    if (!S.jackpots[g] || (j.ts || 0) > (S.jackpots[g].ts || 0)) { S.jackpots[g] = j; changed = true; }
+  }
+  if (adoptScalars) {
+    if (remote.results) S.results = Object.assign({}, remote.results, S.results);
+    if (typeof remote.budget?.limit === 'number') S.budget.limit = remote.budget.limit;
+    if (remote.alerts) S.alerts = Object.assign({}, S.alerts, remote.alerts);
+    if (remote.theme) S.theme = remote.theme;
+    changed = true;
+  }
+  return changed;
+}
+async function diskPull() {
+  if (!onLocalServer() || DISK.pulled) return;
+  DISK.pulled = true;
+  try {
+    const r = await fetch('api/store', { cache: 'no-store' });
+    if (!r.ok) return;
+    const j = await r.json();
+    DISK.on = true; DISK.file = j.file || ''; DISK.csv = j.csv || '';
+    if (j.state && mergeState(j.state, FRESH_BROWSER)) { save(); applyTheme(); initResults(); refreshCurrentView(); }
+  } catch { DISK.on = false; }
+  finally { DISK.pullDone = true; }
+}
+function diskSaveSoon() {
+  if (!onLocalServer()) return;
+  clearTimeout(DISK.t);
+  DISK.t = setTimeout(async () => {
+    // never write before the first read lands, or a boot-time save would wipe the file
+    if (!DISK.pullDone) return diskSaveSoon();
+    try {
+      const r = await fetch('api/store', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(S) });
+      const j = await r.json().catch(() => ({}));
+      DISK.on = !!j.ok;
+      if (j.file) { DISK.file = j.file; DISK.csv = j.csv || ''; }
+    } catch { DISK.on = false; }
+  }, 600);
+}
 
 /* results store: seed + fetched/manual merged, ascending by date */
 const RES = {};
@@ -1325,7 +1382,19 @@ function openAccount() {
         <p class="muted small" style="margin:5px 0 0">Your session is active. Tickets and settings stay saved securely.</p>
         ${ACCT.sync ? '<div class="rowflex" style="margin-top:10px"><button class="obtn gold" id="syncNow">Sync now</button></div>' : ''}
       </div>
+      ${DISK.on ? `<div class="card" style="margin-top:12px">
+        <b>💾 Saved to this PC</b>
+        <p class="muted small" style="margin:5px 0 0">Every ticket is written to a file the moment you save it:</p>
+        <p class="small" style="margin:6px 0 0;word-break:break-all"><code>${esc(DISK.file)}</code></p>
+        <p class="muted small" style="margin:6px 0 0">Readable spreadsheet copy: <code>${esc(DISK.csv)}</code></p>
+      </div>` : ''}
+      ${DISK.on ? '' : `<div class="card" style="margin-top:12px">
+        <b>💾 Backup${backupSummary().stale && S.tickets.length ? ' <span style="color:var(--warn,#e0a33c)">⚠</span>' : ''}</b>
+        <p class="muted small" style="margin:5px 0 10px">Tickets are stored in this browser. Save a copy to move them between devices.</p>
+        <button class="obtn" id="acctBackup" style="width:100%">Backup &amp; restore</button>
+      </div>`}
       <div style="margin-top:14px"><button class="obtn" id="signOut" style="width:100%">Sign out</button></div>`);
+    const ab = $('#acctBackup'); if (ab) ab.onclick = openBackup;
     const sn = $('#syncNow'); if (sn) sn.onclick = async () => { await syncPull(); syncPushSoon(); toast('Synced', true); };
     $('#signOut').onclick = async () => {
       ACCT.user = null;
@@ -1888,8 +1957,13 @@ function openTicketSave(g, lines) {
       lines: lines.map(L => ({ ...L, wager, bet })), addons,
       cost: ticketCost(g, lines.length, addons, wager), created: todayISO(),
     });
+    S.ticketsAt = Date.now();
     save(); closeSheet(); setView('tickets'); toast('Ticket saved — good luck! 🍀', true);
     scheduleAlerts();
+    // web copies keep tickets in this browser only — nudge toward a backup, but never nag
+    if (!DISK.on && backupSummary().stale && S.tickets.length % 3 === 1) {
+      setTimeout(() => toast('Tip: Budget → Backup keeps these safe if you clear your browser'), 1500);
+    }
   };
 }
 function renderTickets() {
@@ -2234,9 +2308,11 @@ function renderBudget() {
   ${S.budget.manual.length ? `<div class="card" style="margin-top:11px"><b>Quick-logged</b>
     ${S.budget.manual.slice(-8).reverse().map((m, i) => `<div class="rankrow"><span class="small muted" style="min-width:86px">${fmtDateNice(m.d)}</span><span class="small">${esc(m.note || (m.kind === 'spend' ? 'spend' : 'win'))}</span><span class="val" style="color:${m.kind === 'win' ? 'var(--ok)' : 'var(--ink2)'}">${m.kind === 'win' ? '+' : '−'}${fmtUSD(m.amt)}</span></div>`).join('')}</div>` : ''}
   <div class="card" style="margin-top:11px">
-    <b>Backup</b>
-    <p class="muted small" style="margin:5px 0 10px">Tickets & settings live only in this browser. Export a backup once in a while.</p>
-    <div class="rowflex"><button class="obtn" id="exp">⬇ Export data</button><button class="obtn" id="imp">⬆ Restore</button><input type="file" id="impfile" accept=".json" style="display:none"></div>
+    <b>Backup${backupSummary().stale && S.tickets.length ? ' <span style="color:var(--warn,#e0a33c)">⚠</span>' : ''}</b>
+    <p class="muted small" style="margin:5px 0 10px">${backupSummary().stale && S.tickets.length
+      ? 'You\'ve saved tickets since your last backup — they exist only in this browser right now.'
+      : 'Tickets & settings live only in this browser. Save a copy once in a while.'}</p>
+    <div class="rowflex"><button class="obtn gold" id="bkOpen" style="width:100%">💾 Backup &amp; restore</button></div>
   </div>
   <div class="footnote">Play for entertainment, with money you can afford to lose.<br>If it stops being fun: <b>1-800-GAMBLER</b> (NJ, free & confidential).</div>`;
   $('#editlim').onclick = () => {
@@ -2258,14 +2334,129 @@ function renderBudget() {
       if ($('#qkind') && $('#qkind').value === 'win') confetti();
     };
   };
-  $('#exp').onclick = () => saveFile('jackpot-hq-backup-' + todayISO() + '.json', JSON.stringify(S, null, 1));
-  $('#imp').onclick = () => $('#impfile').click();
-  $('#impfile').onchange = (e) => {
+  $('#bkOpen').onclick = openBackup;
+}
+
+/* ============================================================
+   BACKUP / RESTORE — the portable copy of your tickets
+   Web copies keep data in this browser only, so this is the way tickets move
+   between devices (and survive clearing the browser) until KV sync is on.
+   Three ways out and three ways back in, because file downloads are unreliable
+   on mobile browsers: file, share sheet, or plain text you can paste anywhere.
+   ============================================================ */
+const backupName = () => 'jackpot-hq-backup-' + todayISO() + '.json';
+const backupText = () => JSON.stringify(S, null, 1);
+function backupSummary() {
+  const n = (S.tickets || []).length;
+  const last = S.backupAt ? new Date(S.backupAt) : null;
+  const stale = !last || (S.ticketsAt || 0) > (S.backupAt || 0);
+  return { n, last, stale };
+}
+function markBackedUp() { S.backupAt = Date.now(); save(); }
+
+async function backupShare() {
+  const text = backupText();
+  try {
+    const file = new File([text], backupName(), { type: 'application/json' });
+    if (navigator.canShare && navigator.canShare({ files: [file] })) {
+      await navigator.share({ files: [file], title: 'Jackpot HQ backup' });
+      markBackedUp();
+      return true;
+    }
+  } catch (e) {
+    if (e && e.name === 'AbortError') return true; // user closed the share sheet
+  }
+  return false;
+}
+async function backupCopy() {
+  const text = backupText();
+  try {
+    await navigator.clipboard.writeText(text);
+    markBackedUp();
+    toast('Backup copied — paste it somewhere safe 📋', true);
+    return true;
+  } catch {
+    const ta = $('#bkText');
+    if (ta) { ta.style.display = 'block'; ta.value = text; ta.focus(); ta.select(); toast('Select all and copy this text'); }
+    return false;
+  }
+}
+function restoreFrom(txt, replace) {
+  let data;
+  try { data = JSON.parse(txt); } catch { return toast('That doesn\'t look like a Jackpot HQ backup'); }
+  if (!data || typeof data !== 'object' || !Array.isArray(data.tickets)) return toast('That doesn\'t look like a Jackpot HQ backup');
+  const before = (S.tickets || []).length;
+  if (replace) {
+    S = Object.assign({}, DEFAULTS, data);
+    // fresh containers: Object.assign would otherwise alias DEFAULTS' own objects,
+    // and addResults() mutating them would poison every later restore this session
+    S.budget = Object.assign({}, DEFAULTS.budget, data.budget);
+    S.alerts = Object.assign({}, DEFAULTS.alerts, data.alerts);
+    S.results = Object.assign({}, data.results);
+    S.jackpots = Object.assign({}, data.jackpots);
+  } else {
+    mergeState(data, true);
+  }
+  save(); applyTheme(); initResults(); scheduleAlerts(); closeSheet(); refreshCurrentView();
+  const now = (S.tickets || []).length;
+  toast(replace ? `Replaced — ${now} ticket${now === 1 ? '' : 's'} restored ✓`
+    : `Merged — ${now - before} new, ${now} total ✓`, true);
+}
+function openBackup() {
+  const { n, last, stale } = backupSummary();
+  openSheet(`<h3>💾 Backup & restore</h3>
+    <p class="muted small">Your ${n} ticket${n === 1 ? '' : 's'} live in <b>this browser only</b>. Save a copy to keep them
+    — and to move them to another phone or computer.</p>
+    ${stale && n ? '<p class="small" style="color:var(--warn,#e0a33c);margin:8px 0 0">⚠ You have tickets saved since your last backup.</p>' : ''}
+    ${last ? `<p class="muted small" style="margin:6px 0 0">Last backup: ${last.toLocaleString()}</p>` : ''}
+
+    <div class="card" style="margin-top:12px">
+      <b>Save a copy</b>
+      <p class="muted small" style="margin:5px 0 10px">Any one of these is a complete backup.</p>
+      <div class="rowflex" style="flex-wrap:wrap;gap:8px">
+        <button class="obtn gold" id="bkDl">⬇ Download file</button>
+        <button class="obtn" id="bkShare">📤 Share / Save to Files</button>
+        <button class="obtn" id="bkCopy">📋 Copy as text</button>
+      </div>
+      <p class="muted small" style="margin:9px 0 0">On iPhone, <b>Share</b> and <b>Copy</b> are the reliable ones — Safari often ignores downloads.</p>
+    </div>
+
+    <div class="card" style="margin-top:11px">
+      <b>Bring tickets back</b>
+      <p class="muted small" style="margin:5px 0 10px">Merging keeps everything on this device and adds anything missing — nothing gets deleted.</p>
+      <div class="rowflex" style="flex-wrap:wrap;gap:8px">
+        <button class="obtn" id="bkFile">⬆ Restore from file</button>
+        <button class="obtn" id="bkPaste">📥 Paste backup text</button>
+      </div>
+      <input type="file" id="bkFileIn" accept=".json,application/json" style="display:none">
+      <textarea id="bkText" style="display:none;width:100%;margin-top:10px;min-height:110px;font-family:ui-monospace,monospace;font-size:11px" placeholder="Paste your backup here, then tap Restore"></textarea>
+      <div id="bkPasteGo" style="display:none;margin-top:8px"><button class="obtn gold" id="bkPasteBtn" style="width:100%">Restore pasted backup</button></div>
+      <label class="muted small" style="display:flex;align-items:center;gap:7px;margin-top:11px">
+        <input type="checkbox" id="bkReplace"> Replace everything instead of merging
+      </label>
+    </div>`);
+
+  const replacing = () => !!$('#bkReplace')?.checked;
+  const confirmReplace = () => !replacing() || confirm('Replace all tickets and settings on this device with the backup? Anything not in the backup is lost.');
+
+  $('#bkDl').onclick = () => { saveFile(backupName(), backupText()); markBackedUp(); };
+  $('#bkShare').onclick = async () => { if (!(await backupShare())) { toast('Sharing not available — downloading instead'); saveFile(backupName(), backupText()); markBackedUp(); } };
+  $('#bkCopy').onclick = backupCopy;
+  $('#bkFile').onclick = () => { if (confirmReplace()) $('#bkFileIn').click(); };
+  $('#bkFileIn').onchange = (e) => {
     const f = e.target.files[0]; if (!f) return;
-    f.text().then(txt => {
-      try { const data = JSON.parse(txt); if (!data || typeof data !== 'object' || !('tickets' in data)) throw 0; S = Object.assign({}, DEFAULTS, data); save(); initResults(); refreshCurrentView(); toast('Backup restored ✓', true); }
-      catch { toast('That file doesn\'t look like a Jackpot HQ backup'); }
-    });
+    const r = replacing();
+    f.text().then(txt => restoreFrom(txt, r)).catch(() => toast('Could not read that file'));
+  };
+  $('#bkPaste').onclick = async () => {
+    const ta = $('#bkText'); ta.style.display = 'block'; $('#bkPasteGo').style.display = 'block';
+    if (!ta.value) { try { const t = await navigator.clipboard.readText(); if (t) ta.value = t; } catch { } }
+    ta.focus();
+  };
+  $('#bkPasteBtn').onclick = () => {
+    const txt = $('#bkText').value.trim();
+    if (!txt) return toast('Paste your backup into the box first');
+    if (confirmReplace()) restoreFrom(txt, replacing());
   };
 }
 
@@ -2515,6 +2706,7 @@ renderHome();
 scheduleAlerts();
 aiProbe(); // discover which AI models the /api endpoint offers
 authProbe(); // signed in? pull synced tickets/budget/settings
+diskPull(); // local server running? restore tickets from state.json
 const acctBtn = $('#btn-acct'); if (acctBtn) acctBtn.onclick = openAccount;
 if (navigator.onLine) syncResults(true); // always refresh on open — draws happen nightly
 // web-hosted copies: pull live.json (refreshed hourly by the cloud job) from the same host

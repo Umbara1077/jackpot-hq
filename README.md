@@ -4,8 +4,9 @@ Your NJ Lottery tracker & number lab. Built Aug 5, 2026.
 
 ## Open it
 
-- **PC:** double-click `index.html` (works offline; auto-updates Powerball, Mega Millions
-  & Millionaire for Life results when online).
+- **PC:** double-click **`Jackpot HQ.cmd`** — refreshes live data, then opens the app with
+  ticket-saving to disk turned on (see *Where your tickets are saved*). Needs Node installed.
+  `index.html` still opens standalone if you'd rather, but saves only to localStorage.
 - **Phone:** open your private artifact at
   https://claude.ai/code/artifact/49051ebc-c66d-49f5-abc1-dc28ac61a916
   (sign in to claude.ai → it's also under claude.ai/code/artifacts).t
@@ -24,6 +25,7 @@ Your NJ Lottery tracker & number lab. Built Aug 5, 2026.
 | `functions/api/sync.js` | Cross-device sync blob for signed-in users (KV) |
 | `functions/_session.js` | Shared signed-cookie session helpers |
 | `worker/index.js` + `wrangler.jsonc` | Makes Cloudflare run the API (see “Why variables were blocked”) |
+| `scripts/serve.mjs` | Local server + the on-disk ticket store (`/api/store`) |
 | `scripts/fetch-live.mjs` + `.github/workflows/refresh.yml` | Hourly cloud data refresh (`live.json`) |
 | `DESIGN.md` | Design doc: games, odds, features, architecture |
 
@@ -46,6 +48,25 @@ to the same handlers in `functions/` and serves everything else as static files.
 Add API keys as **Secrets**, not plaintext variables: `wrangler deploy` replaces plaintext vars
 declared in config but preserves secrets. Same reason the KV binding for sync must be declared
 in `wrangler.jsonc` rather than added in the dashboard.
+
+### ⚠ Why your environment variables keep vanishing on their own
+
+`wrangler deploy` is **declarative**: whatever `wrangler.jsonc` says is the complete truth for
+the Worker. It has no `vars` block, so every deploy wipes plaintext variables added in the
+dashboard. Nothing merges them back.
+
+The reason it looks spontaneous: `.github/workflows/refresh.yml` runs **hourly**, commits
+`live.json`, and pushes to `main` — and that push triggers a Cloudflare build, which runs
+`wrangler deploy`, which clears the vars again. You never touched anything; a bot did.
+
+Three fixes, use the first:
+
+1. **Re-add every key as a Secret** (Settings → Variables and Secrets → *Encrypt* / type
+   Secret). Secrets are stored separately and survive `wrangler deploy`. This is the fix.
+2. Or stop the hourly redeploy: Cloudflare → your Worker → Settings → Build → **watch paths**,
+   exclude `live.json`. Data still refreshes; pushes stop rebuilding the Worker.
+3. Non-sensitive values only (never API keys — this repo is on GitHub) can go in a `"vars"`
+   block in `wrangler.jsonc`, which makes them survive by being declared.
 
 Note: the tracked file `api/ai-pick` is a static test fixture that reports every model as
 available. It sits at the same path as the real endpoint; `run_worker_first` in `wrangler.jsonc`
@@ -128,10 +149,53 @@ Register-ScheduledTask -TaskName 'JackpotHQ Updater' -Action $a -Trigger $t -Set
 
 (Remove anytime with `Unregister-ScheduledTask -TaskName 'JackpotHQ Updater'`.)
 
+## Where your tickets are saved
+
+Launch with **`Jackpot HQ.cmd`** and every ticket is written to a real file the moment you
+save it — no account, no setup, nothing to click. The launcher starts `scripts/serve.mjs`
+and opens the app at `http://localhost:8123`; the app posts its whole state to `/api/store`
+after each change.
+
+| File | What it is |
+|---|---|
+| `%LOCALAPPDATA%\JackpotHQ\state.json` | Everything — tickets, budget, settings. This is the real save file. |
+| `%LOCALAPPDATA%\JackpotHQ\state.bak.json` | The previous version, kept automatically on every write. |
+| `%LOCALAPPDATA%\JackpotHQ\tickets.csv` | One row per line played — double-click to open in Excel. |
+
+Clearing your browser, switching browsers, or losing localStorage no longer loses tickets:
+on open the app reads `state.json` back and **unions** it with whatever the browser has, so
+neither copy can delete a ticket from the other. Account → **💾 Saved to this PC** shows the
+exact paths. Files live outside the repo on purpose — this folder is OneDrive-synced and
+Controlled Folder Access blocks script writes to it, which would silently break saving.
+
+Opening `index.html` directly still works, but that's the old localStorage-only behavior —
+use the `.cmd` if you want tickets on disk.
+
+## Backup & restore (the web copy — Cloudflare, phone artifact)
+
+Hosted copies keep tickets in that browser's localStorage, so **Budget → 💾 Backup & restore**
+is how they get out. Three ways to save, three ways back:
+
+| Save a copy | Notes |
+|---|---|
+| ⬇ **Download file** | `jackpot-hq-backup-YYYY-MM-DD.json`. Best on desktop. |
+| 📤 **Share / Save to Files** | Uses the OS share sheet — the reliable one on iPhone/Android. |
+| 📋 **Copy as text** | Puts the whole backup on the clipboard; paste into Notes, email, anywhere. |
+
+Restore with **⬆ Restore from file** or **📥 Paste backup text**. Restoring **merges by
+default** — it unions tickets by id, so nothing on the device is deleted and re-importing the
+same file twice is harmless. Tick *Replace everything* (with a confirm) only if you want the
+backup to win outright.
+
+Safari often ignores blob downloads, which is why Share and Copy exist — on iPhone use those.
+
+The app tracks when you last backed up and shows a ⚠ on the Budget tab once you've saved
+tickets since. This is the stopgap until the KV sync below is switched on.
+
 ## Notes
 
-- Tickets/budget live in the browser you use (localStorage). Use **Budget → Export data**
-  for backups; PC and phone each keep their own data.
+- Hosted copies keep tickets per-browser; the PC copy launched with `Jackpot HQ.cmd` saves to
+  disk automatically. Cross-device sync needs the KV binding below.
 - Manual entry (↻ on a game card) and jackpot tap-to-edit (✎) still exist as fallbacks —
   the phone artifact can't reach lottery servers (platform security), so it relies on them.
 - Windows note: this OneDrive folder blocks writes from scripts (Controlled Folder Access),
