@@ -1358,11 +1358,12 @@ function mergeRemote(remote) {
 async function syncPull() {
   try {
     const r = await fetch('api/sync', { cache: 'no-store' });
-    if (!r.ok) return false;
-    const j = await r.json();
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) { ACCT.lastSyncErr = j.detail || j.error || ('HTTP ' + r.status); return false; }
+    ACCT.lastSyncErr = null;
     if (j.state && mergeRemote(j.state)) { save(); applyTheme(); refreshCurrentView(); }
     return true;
-  } catch { return false; }
+  } catch (e) { ACCT.lastSyncErr = String(e?.message || e); return false; }
 }
 function syncPushSoon(immediate) {
   if (!onWeb() || !ACCT.user || !ACCT.sync) return Promise.resolve({ ok: false, err: 'sync off' });

@@ -68,11 +68,28 @@ export async function onRequest(context) {
 
   if (action === 'me') {
     const user = await verifySession(request.headers.get('cookie'), secret);
+    let db = null;
+    if (env.DB) {
+      try {
+        await env.DB.prepare('SELECT 1 AS n').first();
+        const t = await env.DB.prepare(
+          "SELECT name FROM sqlite_master WHERE type='table' AND name='user_state'"
+        ).first();
+        db = { ok: true, hasUserState: !!t };
+      } catch (e) {
+        db = {
+          ok: false,
+          detail: String(e?.message || e),
+          cause: String(e?.cause?.message || e?.cause || ''),
+        };
+      }
+    }
     return json({
       user: user ? { email: user.email || null, name: user.name || null, provider: user.provider } : null,
       providers: { google: googleReady(env), apple: appleReady(env), password: true },
       sync: !!(env.DB || env.USERS),
       syncBackend: env.DB ? 'd1' : (env.USERS ? 'kv' : null),
+      db,
     });
   }
 

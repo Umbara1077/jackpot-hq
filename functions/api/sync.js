@@ -12,13 +12,17 @@ const CREATE_SQL = `CREATE TABLE IF NOT EXISTS user_state (
   user_sub TEXT PRIMARY KEY NOT NULL,
   state_json TEXT NOT NULL,
   updated_at INTEGER NOT NULL
-)`;
+);`;
 
-let ensured = false;
+function errDetail(e) {
+  const parts = [e?.message, e?.cause?.message, e?.cause?.cause?.message, e?.toString?.()];
+  return [...new Set(parts.filter(Boolean).map(String))].join(' | ') || 'unknown error';
+}
+
 async function ensureSchema(env) {
-  if (!env.DB || ensured) return;
-  await env.DB.prepare(CREATE_SQL).run();
-  ensured = true;
+  if (!env.DB) return;
+  if (typeof env.DB.exec === 'function') await env.DB.exec(CREATE_SQL);
+  else await env.DB.prepare(CREATE_SQL.replace(/;$/, '')).run();
 }
 
 async function loadState(env, sub) {
@@ -37,13 +41,20 @@ async function loadState(env, sub) {
 async function saveState(env, sub, text) {
   if (env.DB) {
     await ensureSchema(env);
-    await env.DB.prepare(
-      `INSERT INTO user_state (user_sub, state_json, updated_at)
-       VALUES (?, ?, ?)
-       ON CONFLICT(user_sub) DO UPDATE SET
-         state_json = excluded.state_json,
-         updated_at = excluded.updated_at`
-    ).bind(sub, text, Date.now()).run();
+    const now = Date.now();
+    // Prefer plain UPDATE/INSERT over ON CONFLICT — fewer D1 edge-case failures
+    const existing = await env.DB.prepare(
+      'SELECT user_sub FROM user_state WHERE user_sub = ?'
+    ).bind(sub).first();
+    if (existing) {
+      await env.DB.prepare(
+        'UPDATE user_state SET state_json = ?, updated_at = ? WHERE user_sub = ?'
+      ).bind(text, now, sub).run();
+    } else {
+      await env.DB.prepare(
+        'INSERT INTO user_state (user_sub, state_json, updated_at) VALUES (?, ?, ?)'
+      ).bind(sub, text, now).run();
+    }
     return;
   }
   await env.USERS.put('state:' + sub, text);
@@ -58,10 +69,9 @@ export async function onRequestGet(context) {
   if (!user) return json({ error: 'not signed in' }, 401);
   try {
     const state = await loadState(env, user.sub);
-    return json({ ok: true, state, backend: env.DB ? 'd1' : 'kv' });
+    return json({ ok: true, state, backend: env.DB ? 'd1' : 'kv', sub: user.sub });
   } catch (e) {
-    ensured = false;
-    return json({ error: 'read failed', detail: String(e?.message || e) }, 500);
+    return json({ error: 'read failed', detail: errDetail(e) }, 500);
   }
 }
 
@@ -77,9 +87,8 @@ export async function onRequestPost(context) {
   try { JSON.parse(text); } catch { return json({ error: 'bad json' }, 400); }
   try {
     await saveState(env, user.sub, text);
-    return json({ ok: true, savedAt: Date.now(), backend: env.DB ? 'd1' : 'kv' });
+    return json({ ok: true, savedAt: Date.now(), backend: env.DB ? 'd1' : 'kv', sub: user.sub });
   } catch (e) {
-    ensured = false;
-    return json({ error: 'write failed', detail: String(e?.message || e) }, 500);
+    return json({ error: 'write failed', detail: errDetail(e) }, 500);
   }
 }
