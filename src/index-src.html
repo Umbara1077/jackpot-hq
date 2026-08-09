@@ -757,40 +757,118 @@ details.rt p{color:var(--ink2); font-size:13px; margin:9px 0 2px; line-height:1.
   #view-budget.on > .footnote{grid-column:1/-1}
 }
 /* ============ GRAPHICAL LOGIN GATE ============ */
+/* ---------- login gate ----------
+   Every colour below is a gate-local token, deliberately NOT --ink/--gold. The gate paints
+   its own backdrop, so borrowing the theme's text colours put near-black type on the
+   near-black card in light mode and the whole screen became unreadable. Both themes are
+   defined here in full. */
 .login-gate {
+  --lg-text: #f7f3e7; --lg-dim: #c6cfc3; --lg-faint: #93a08f;
+  --lg-card: rgba(19, 29, 24, 0.9); --lg-edge: rgba(255, 255, 255, 0.16);
+  --lg-field: rgba(7, 13, 10, 0.72); --lg-field-edge: rgba(232, 184, 75, 0.3);
+  --lg-accent: #e8b84b; --lg-accent-soft: #f5dfa2; --lg-pink: #ff8ad8;
+  --lg-aura1: rgba(255, 138, 216, 0.3); --lg-aura2: rgba(165, 184, 255, 0.24);
+  --lg-aura3: rgba(232, 184, 75, 0.18); --lg-base1: #080d0a; --lg-base2: #0d1512;
+  --lg-shadow: rgba(0, 0, 0, 0.62);
+  /* button gets its own ramp: the brand gold is too light for cream text in light mode */
+  --lg-btn-ink: #1c1305; --lg-btn-1: #f5dfa2; --lg-btn-2: #c99c33;
   position: fixed; inset: 0; z-index: 100; display: none; place-items: center; padding: 20px;
-  background: radial-gradient(circle at 50% 20%, rgba(255, 138, 216, 0.28), transparent 70%),
-              radial-gradient(circle at 80% 80%, rgba(165, 184, 255, 0.22), transparent 60%),
-              linear-gradient(180deg, #090e0b, #0c1310);
-  backdrop-filter: blur(24px);
+  background:
+    radial-gradient(circle at 50% 12%, var(--lg-aura1), transparent 62%),
+    radial-gradient(circle at 84% 82%, var(--lg-aura2), transparent 58%),
+    radial-gradient(circle at 12% 74%, var(--lg-aura3), transparent 55%),
+    linear-gradient(180deg, var(--lg-base1), var(--lg-base2));
+  background-size: 200% 200%, 200% 200%, 200% 200%, 100% 100%;
+  animation: lgAurora 22s ease-in-out infinite;
+  color: var(--lg-text);
+}
+:root[data-theme="light"] .login-gate {
+  --lg-text: #1b2a21; --lg-dim: #4b5b4f; --lg-faint: #74836f;
+  --lg-card: rgba(255, 255, 255, 0.92); --lg-edge: rgba(24, 48, 36, 0.12);
+  --lg-field: rgba(255, 255, 255, 0.96); --lg-field-edge: rgba(150, 118, 40, 0.34);
+  --lg-accent: #9c7420; --lg-accent-soft: #b8912f; --lg-pink: #c23a8c;
+  --lg-aura1: rgba(255, 168, 222, 0.5); --lg-aura2: rgba(163, 190, 255, 0.45);
+  --lg-aura3: rgba(255, 214, 130, 0.5); --lg-base1: #f4f8f3; --lg-base2: #e7efe8;
+  --lg-shadow: rgba(46, 66, 54, 0.18);
+  --lg-btn-ink: #fffbe9; --lg-btn-1: #8a6518; --lg-btn-2: #5f4310;
+}
+@keyframes lgAurora {
+  0%, 100% { background-position: 0% 0%, 100% 100%, 0% 100%, 0 0; }
+  50%      { background-position: 60% 40%, 40% 60%, 70% 30%, 0 0; }
 }
 .login-gate.on { display: grid; }
 .login-card {
-  width: min(440px, 100%); padding: 32px 28px; border-radius: 26px;
-  background: rgba(22, 34, 28, 0.88); border: 1.5px solid rgba(255, 138, 216, 0.35);
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6), 0 0 40px rgba(255, 138, 216, 0.2);
-  backdrop-filter: blur(20px); text-align: center; position: relative; overflow: hidden;
+  width: min(430px, 100%); padding: 34px 30px 30px; border-radius: 28px;
+  background: var(--lg-card); border: 1px solid var(--lg-edge);
+  box-shadow: 0 24px 70px var(--lg-shadow), 0 0 0 1px rgba(255, 255, 255, 0.04) inset;
+  backdrop-filter: blur(22px) saturate(1.3); text-align: center; position: relative; overflow: hidden;
+  animation: lgRise 0.6s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
-.login-brand { display: flex; flex-direction: column; align-items: center; gap: 8px; margin-bottom: 16px; }
+/* hairline of gold along the top edge */
+.login-card::before {
+  content: ''; position: absolute; inset: 0 0 auto; height: 1px;
+  background: linear-gradient(90deg, transparent, var(--lg-accent), var(--lg-pink), transparent);
+  opacity: 0.85;
+}
+@keyframes lgRise { from { opacity: 0; transform: translateY(14px) scale(0.985); } to { opacity: 1; transform: none; } }
+.login-brand { display: flex; flex-direction: column; align-items: center; gap: 10px; margin-bottom: 14px; }
 .login-logo-ring {
-  width: 58px; height: 58px; border-radius: 50%; display: grid; place-items: center;
-  font-family: var(--display); font-size: 32px; font-weight: 800; color: #1a1207;
-  background: radial-gradient(circle at 38% 30%, #f7e6b0, #e8b84b 55%, #926d1d);
-  box-shadow: 0 6px 20px rgba(232, 184, 75, 0.4), inset 0 2px 4px rgba(255, 255, 255, 0.6);
+  width: 64px; height: 64px; border-radius: 50%; display: grid; place-items: center;
+  font-family: var(--display); font-size: 34px; font-weight: 800; color: #1a1207;
+  background: radial-gradient(circle at 38% 28%, #fbf1cf, #e8b84b 52%, #8a6518);
+  box-shadow: 0 8px 26px rgba(232, 184, 75, 0.42), inset 0 2px 5px rgba(255, 255, 255, 0.7);
+  position: relative; overflow: hidden;
 }
-.login-brand h2 { font-family: var(--display); font-size: 30px; font-weight: 700; margin: 0; color: var(--ink); letter-spacing: 0.5px; }
-.login-brand h2 em { font-style: italic; color: var(--gold); }
-.login-badge { font-size: 10px; font-weight: 800; letter-spacing: 0.2em; text-transform: uppercase; color: #ff8ad8; background: rgba(255, 138, 216, 0.15); border: 1px solid rgba(255, 138, 216, 0.4); padding: 4px 12px; border-radius: 99px; }
-.login-desc { font-size: 13.5px; color: var(--ink2); line-height: 1.5; margin: 0 0 20px; }
-.login-card .formrow { text-align: left; margin-top: 14px; }
-.login-card .formrow label { font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--ink3); font-weight: 700; margin-bottom: 6px; display: block; }
+/* slow sheen sweeping across the coin */
+.login-logo-ring::after {
+  content: ''; position: absolute; inset: -60%;
+  background: linear-gradient(70deg, transparent 42%, rgba(255, 255, 255, 0.75) 50%, transparent 58%);
+  animation: lgSheen 4.5s ease-in-out infinite;
+}
+@keyframes lgSheen { 0%, 65% { transform: translateX(-120%); } 100% { transform: translateX(120%); } }
+.login-brand h2 { font-family: var(--display); font-size: 32px; font-weight: 700; margin: 0; color: var(--lg-text); letter-spacing: 0.4px; }
+.login-brand h2 em { font-style: italic; color: var(--lg-accent); }
+.login-badge {
+  font-size: 10px; font-weight: 800; letter-spacing: 0.2em; text-transform: uppercase;
+  color: var(--lg-pink); background: color-mix(in srgb, var(--lg-pink) 14%, transparent);
+  border: 1px solid color-mix(in srgb, var(--lg-pink) 45%, transparent);
+  padding: 5px 13px; border-radius: 99px;
+}
+.login-desc { font-size: 13.5px; color: var(--lg-dim); line-height: 1.55; margin: 0 0 22px; }
+.login-card .formrow { text-align: left; margin-top: 15px; }
+.login-card .formrow label {
+  font-size: 10.5px; letter-spacing: 0.15em; text-transform: uppercase;
+  color: var(--lg-faint); font-weight: 700; margin-bottom: 7px; display: block;
+}
 .login-card input {
-  font-size: 15px; font-weight: 600; padding: 13px 15px; border-radius: 14px;
-  background: rgba(12, 19, 16, 0.85); border: 1px solid rgba(232, 184, 75, 0.25); color: var(--ink);
-  transition: all 0.18s ease; outline: none; width: 100%;
+  font-size: 15px; font-weight: 600; padding: 14px 15px; border-radius: 14px;
+  background: var(--lg-field); border: 1px solid var(--lg-field-edge); color: var(--lg-text);
+  transition: border-color 0.18s ease, box-shadow 0.18s ease; outline: none; width: 100%;
 }
-.login-card input:focus { border-color: #ff8ad8; box-shadow: 0 0 0 3px rgba(255, 138, 216, 0.25); }
-.login-btn { margin-top: 22px; width: 100%; font-size: 15px; font-weight: 800; padding: 15px; border-radius: 16px; cursor: pointer; }
+.login-card input::placeholder { color: var(--lg-faint); font-weight: 500; }
+.login-card input:focus {
+  border-color: var(--lg-pink);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--lg-pink) 22%, transparent);
+}
+.login-btn {
+  margin-top: 24px; width: 100%; font-size: 15px; font-weight: 800; padding: 15px;
+  border-radius: 16px; cursor: pointer; border: 0; letter-spacing: 0.02em;
+  color: var(--lg-btn-ink);
+  background: linear-gradient(180deg, var(--lg-btn-1), var(--lg-btn-2));
+  box-shadow: 0 8px 24px color-mix(in srgb, var(--lg-btn-2) 40%, transparent), inset 0 1px 0 rgba(255, 255, 255, 0.4);
+  transition: transform 0.14s ease, box-shadow 0.18s ease, filter 0.18s ease;
+}
+.login-btn:hover { filter: brightness(1.06); box-shadow: 0 10px 30px color-mix(in srgb, var(--lg-accent) 44%, transparent), inset 0 1px 0 rgba(255, 255, 255, 0.55); }
+.login-btn:active { transform: translateY(1px); }
+.login-foot {
+  margin: 18px 0 0; font-size: 10.5px; letter-spacing: 0.18em; text-transform: uppercase;
+  color: var(--lg-faint); font-weight: 700;
+}
+@media (prefers-reduced-motion: reduce) {
+  .login-gate { animation: none; }
+  .login-card { animation: none; }
+  .login-logo-ring::after { animation: none; opacity: 0; }
+}
 </style>
 </head>
 <body>
@@ -802,7 +880,7 @@ details.rt p{color:var(--ink2); font-size:13px; margin:9px 0 2px; line-height:1.
       <h2>Jackpot <em>HQ</em></h2>
       <span class="login-badge">AI Assistant & Lab</span>
     </div>
-    <p class="login-desc">Sign in to continue.</p>
+    <p class="login-desc">Welcome back. Sign in for your tickets,<br>budget and tonight's picks.</p>
     <form id="loginGateForm" onsubmit="return false;">
       <div class="formrow">
         <label for="gateUser">Username</label>
@@ -812,8 +890,9 @@ details.rt p{color:var(--ink2); font-size:13px; margin:9px 0 2px; line-height:1.
         <label for="gatePass">Password</label>
         <input id="gatePass" type="password" placeholder="admin" value="admin" autocomplete="current-password" required>
       </div>
-      <button type="submit" class="gbtn aibtn login-btn" id="btnGateSubmit">Sign In</button>
+      <button type="submit" class="login-btn" id="btnGateSubmit">Sign In</button>
     </form>
+    <p class="login-foot">New&nbsp;Jersey · Play Responsibly</p>
   </div>
 </div>
 <div id="app">

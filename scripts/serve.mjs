@@ -9,6 +9,7 @@ import { createReadStream, existsSync, statSync, mkdirSync, readFileSync, writeF
 import { join, extname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { homedir } from 'node:os';
+import { execFile } from 'node:child_process';
 
 // fileURLToPath, not URL.pathname: this repo lives under "AI Server 2", and pathname keeps
 // the space percent-encoded, which made every static file 404.
@@ -86,9 +87,28 @@ function handleStore(req, res) {
   });
 }
 
-createServer((req, res) => {
+// Pull today's draws on startup. Without this the PC copy falls back to the seeds bundled
+// at build time, so Pick-3/Pick-4 (which draw twice a day) go stale within hours and show
+// numbers that don't match the official app.
+let refreshing = null;
+function refreshLive() {
+  refreshing = new Promise((done) => {
+    execFile(process.execPath, [join(root, 'scripts', 'fetch-live.mjs')], { cwd: root, timeout: 60000 }, (err, stdout, stderr) => {
+      const line = String(stdout || stderr || err?.message || '').trim().split('\n').pop();
+      console.log(err ? 'live data refresh failed (keeping last saved): ' + line : 'live data: ' + line);
+      done();
+    });
+  });
+  return refreshing;
+}
+
+createServer(async (req, res) => {
   let p = decodeURIComponent(req.url.split('?')[0]);
   if (p === '/api/store') return handleStore(req, res);
+  // hold the app's boot request briefly so it gets today's numbers, not the stale file
+  if (p === '/live.json' && refreshing) {
+    await Promise.race([refreshing, new Promise(r => setTimeout(r, 8000))]);
+  }
   if (p === '/') p = '/index.html';
   const file = join(root, p.replace(/^\/+/, ''));
   if (!file.startsWith(root) || !existsSync(file) || !statSync(file).isFile()) { res.writeHead(404); return res.end('not found'); }
@@ -98,4 +118,5 @@ createServer((req, res) => {
   console.log('Jackpot HQ  →  http://localhost:8123');
   console.log('Tickets saved to ' + STATE);
   console.log('Readable copy  ' + CSV);
+  refreshLive();
 });

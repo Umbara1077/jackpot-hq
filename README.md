@@ -191,6 +191,35 @@ Controlled Folder Access blocks script writes to it, which would silently break 
 Opening `index.html` directly still works, but that's the old localStorage-only behavior —
 use the `.cmd` if you want tickets on disk.
 
+## Prize checking — verified against the official tiers
+
+Jersey Cash 5 used to report a **phantom $4 win** on a losing ticket. The prize table carried a
+`2/5 XTRA` tier worth $2, which then got multiplied by the draw's XTRA number. njlottery.com does
+publish a tier by that name, but checking 14 consecutive draws it paid **$0 to 0 winners every
+time**, while `2/5 B-E` paid ~10,000 winners a draw at $5. Matching 2 plain numbers is a loss,
+XTRA or not, so that tier is gone.
+
+Same pass corrected `4/5` and `3/5`: they are **FIXED** $250 / $15, not pari-mutuel, so the app
+no longer shows them as "≈". Every Jersey Cash 5 outcome now matches the official tiers exactly:
+
+| Match | Pays | Match | Pays |
+|---|---|---|---|
+| 5/5 | Jackpot (pari-mutuel) | 3/5 + Bullseye | $30 |
+| 4/5 + Bullseye | $500 | 3/5 | $15 |
+| 4/5 | $250 | 2/5 + Bullseye | $5 |
+| | | 2/5 | **nothing** |
+
+Anything the app reports is still worth checking against the official app before you throw a
+ticket away — pari-mutuel jackpots and XTRA multipliers move.
+
+## Stale results on the PC copy
+
+Pick-3 and Pick-4 draw twice a day, so the seeds compiled into `index.html` go stale within
+hours. Opening `index.html` directly gets you seed data only — that's why the numbers stopped
+matching the official app. Launching with **`Jackpot HQ.cmd`** now fixes it: `scripts/serve.mjs`
+runs `fetch-live.mjs` on startup and holds the app's first `live.json` request (up to 8s) so the
+page opens with today's draws. Offline, it keeps the last good file and carries on.
+
 ## Backup & restore (the web copy — Cloudflare, phone artifact)
 
 With D1 bound and you signed in, the hosted app syncs tickets to the cloud database

@@ -157,14 +157,17 @@ const GAMES = {
     draws: [{ days: [0, 1, 2, 3, 4, 5, 6], hh: 22, mm: 57, cutoffMin: 4 }],
     addons: [{ id: 'xtra', label: 'XTRA 2–5× (+$1/line)', per: 1 }],
     seed: 'jc5',
+    // Amounts verified against njlottery.com's published prizeTiers: 4/5 and 3/5 are FIXED
+    // (not pari-mutuel) at $250 / $15. There is deliberately NO 2-of-5 tier without the
+    // Bullseye: the API carries a "2/5 Xtra" tier but it has paid $0 to 0 winners in every
+    // draw checked, so matching 2 plain numbers is a loss even with XTRA.
     prizes: [
       { k: 5, b: 0, label: 'JACKPOT', jackpot: true },
       { k: 4, b: 1, label: '$500', amt: 500, be: true },
-      { k: 4, b: 0, label: '≈$250', amt: 250, pari: true },
+      { k: 4, b: 0, label: '$250', amt: 250 },
       { k: 3, b: 1, label: '$30', amt: 30, be: true },
-      { k: 3, b: 0, label: '≈$15', amt: 15, pari: true },
+      { k: 3, b: 0, label: '$15', amt: 15 },
       { k: 2, b: 1, label: '$5', amt: 5, be: true },
-      { k: 2, b: 0, label: '$2 (XTRA only)', amt: 2, xtraOnly: true },
     ],
     multNote: 'Bullseye is included: one of the 5 winning numbers is drawn as the Bullseye — match it for bigger tiers. XTRA (+$1) multiplies non-jackpot wins 2–5×.',
     jackpotSeed: 597e3, jackpotStarts: '$150K', manualResults: true,
