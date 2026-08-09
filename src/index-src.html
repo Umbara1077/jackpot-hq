@@ -26,6 +26,12 @@
   --display:'Didot','Bodoni MT','Playfair Display','Georgia Pro',Georgia,'Times New Roman',serif;
   --body:ui-rounded,'SF Pro Rounded','Segoe UI Variable Text','Segoe UI',system-ui,sans-serif;
   --nav-h:66px;
+  /* Gap from the very bottom edge to the tab bar. The max() floor keeps it clear of the
+     mobile browser's own toolbar, which overlaps fixed elements sitting flush to the edge
+     and which reports safe-area-inset-bottom:0 while it is showing. Everything anchored to
+     the bottom derives from this so they can never drift apart. */
+  --nav-gap:max(16px, calc(10px + env(safe-area-inset-bottom)));
+  --nav-clear:calc(var(--nav-h) + var(--nav-gap) + 16px);
 }
 :root[data-theme="light"]{
   --bg:#f4f0e4; --bg2:#ece7d7; --felt:#e6dfc9;
@@ -39,11 +45,25 @@
   --shadow:0 10px 30px rgba(70,55,20,.16), 0 2px 6px rgba(70,55,20,.10);
 }
 *{box-sizing:border-box; -webkit-tap-highlight-color:transparent}
-html{scroll-behavior:smooth}
+/* Viewport lock: the page scrolls vertically and nothing else.
+   overflow-x:clip beats hidden here — hidden makes the element a scroll container, so the
+   page could still be panned sideways once anything overflowed; clip cannot be scrolled at
+   all. It is set on html AND body because either one can own the sideways drift.
+   overscroll-behavior stops the rubber-band that let you drag past the end into blank space. */
+html{
+  scroll-behavior:smooth;
+  overflow-x:hidden;        /* fallback for browsers without clip */
+  overflow-x:clip;
+  overscroll-behavior:none;
+}
 body{
   margin:0; background:var(--bg); color:var(--ink);
   font-family:var(--body); font-size:15.5px; line-height:1.5;
-  min-height:100svh; overflow-x:hidden;
+  min-height:100svh;
+  width:100%; max-width:100%;
+  overflow-x:hidden;
+  overflow-x:clip;
+  overscroll-behavior:none;
   font-variant-numeric:tabular-nums;
 }
 /* felt atmosphere: viewport-proportional aurora (soft edges at any window size) + grain */
@@ -59,7 +79,12 @@ body::after{
   content:""; position:fixed; inset:-50%; z-index:0; pointer-events:none; opacity:.05;
   background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='240'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='240' height='240' filter='url(%23n)'/%3E%3C/svg%3E");
 }
-#app{position:relative; z-index:1; margin:0 auto; padding:0 16px calc(var(--nav-h) + 26px)}
+/* No overflow clipping here on purpose: nav#tabbar and .fab are position:fixed descendants
+   of #app, and clipping an ancestor risks hiding them. html/body already stop sideways scroll. */
+#app{position:relative; z-index:1; margin:0 auto; padding:0 16px var(--nav-clear); max-width:100%}
+/* Horizontal carousels scroll themselves — contain keeps that swipe from chaining out and
+   dragging the whole page sideways. */
+#tonightrow, .gpick, .tfilter, .statwrap{max-width:100%; overscroll-behavior-x:contain}
 @media(min-width:1000px){ #app{padding-left:30px; padding-right:30px} }
 
 /* ============ header ============ */
@@ -90,7 +115,8 @@ header{
 @keyframes viewin{from{opacity:0} to{opacity:1}}
 nav#tabbar{
   position:fixed; left:50%; transform:translateX(-50%);
-  bottom:calc(10px + env(safe-area-inset-bottom)); z-index:50;
+  bottom:var(--nav-gap); z-index:50;
+  max-width:calc(100% - 20px);
   display:flex; gap:2px; padding:6px;
   background:color-mix(in srgb, var(--card-solid) 86%, transparent);
   border:1px solid var(--card-edge); border-radius:22px;
@@ -603,7 +629,7 @@ button.gbtn.aibtn:hover{transform:translateY(-1px); box-shadow:0 12px 32px rgba(
 .ticket .tline{display:flex; align-items:center; gap:8px; padding:8px 0 2px; flex-wrap:wrap}
 .ticket .prize{margin-left:auto; font-weight:800; color:var(--ok); font-size:14px}
 .fab{
-  position:fixed; right:18px; bottom:calc(var(--nav-h) + 26px + env(safe-area-inset-bottom)); z-index:45;
+  position:fixed; right:18px; bottom:var(--nav-clear); z-index:45;
   width:56px; height:56px; border-radius:19px; border:0; cursor:pointer;
   background:linear-gradient(180deg, var(--gold-hi), var(--gold) 45%, var(--gold-deep));
   color:#1c1305; font-size:30px; font-weight:700; line-height:0;
@@ -690,7 +716,7 @@ svg.freq text{font-family:var(--body)}
 .sw i::after{content:""; position:absolute; left:3px; top:50%; translate:0 -50%; width:19px; height:19px; border-radius:50%; background:var(--ink3); transition:.2s}
 .sw input:checked + i{background:color-mix(in srgb, var(--gold) 30%, var(--card-solid)); border-color:var(--gold-deep)}
 .sw input:checked + i::after{left:22px; background:var(--gold)}
-#toasts{position:fixed; z-index:95; left:50%; transform:translateX(-50%); bottom:calc(var(--nav-h) + 30px + env(safe-area-inset-bottom)); display:flex; flex-direction:column; gap:8px; width:min(420px, calc(100% - 30px))}
+#toasts{position:fixed; z-index:95; left:50%; transform:translateX(-50%); bottom:calc(var(--nav-clear) + 6px); display:flex; flex-direction:column; gap:8px; width:min(420px, calc(100% - 30px))}
 .toast{
   background:var(--card-solid); border:1px solid var(--card-edge); border-radius:14px; padding:12px 15px;
   font-size:13.5px; font-weight:600; box-shadow:var(--shadow); display:flex; gap:10px; align-items:center;
