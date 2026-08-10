@@ -36,6 +36,36 @@ const PANEL_SEATS = [
 ];
 const PROVIDERS = ['anthropic', 'openai', 'xai', 'google'];
 
+/* Effort profiles.
+   `balanced` is deliberately byte-identical to the request that works in production —
+   it is the default, and changing it is what took the standard models down before.
+   Only Anthropic gets a real `effort` API parameter (it already had one). For the other
+   providers effort is expressed through the token ceiling and a prompt line, because
+   inventing new API fields per provider is exactly the move that broke things.
+   Token ceilings are per provider because the known-good values differ: Anthropic ran
+   6000 (thinking counts against it) and the chat-completions providers ran 4000. At
+   `balanced` both must reproduce those exactly. */
+const EFFORTS = {
+  quick: {
+    label: 'Quick', anthropic: 'low', maxTokens: 6000, chatTokens: 4000, ms: 60000,
+    guide: 'Keep your reasoning brief. Go with a sound answer rather than an exhaustive one.',
+  },
+  // ⚠ balanced === the shipped, working request. Do not tune these three fields.
+  balanced: { label: 'Balanced', anthropic: 'medium', maxTokens: 6000, chatTokens: 4000, ms: 120000, guide: '' },
+  deep: {
+    label: 'Deep', anthropic: 'high', maxTokens: 16000, chatTokens: 12000, ms: 210000,
+    guide: 'Reason thoroughly before answering. Work the history properly, weigh several candidate lines against both objectives, and discard the ones that fail.',
+  },
+  max: {
+    label: 'Maximum', anthropic: 'max', maxTokens: 24000, chatTokens: 16000, ms: 300000,
+    guide: 'Take as long as you need. Explore the number space widely, build more candidates than you need, stress-test each against both objectives, and only then choose. Depth matters more than speed here.',
+  },
+};
+const effortOf = (k) => EFFORTS[k] || EFFORTS.balanced;
+const effortKey = (k) => (EFFORTS[k] ? k : 'balanced');
+// The panel is the deep-reasoning mode by definition — never run its seats below `deep`.
+const panelEffort = (k) => (k === 'max' ? 'max' : 'deep');
+
 const GAMES = {
   pb: { name: 'Powerball', pick: 5, max: 69, bonus: 'Powerball', bonusMax: 26 },
   mm: { name: 'Mega Millions', pick: 5, max: 70, bonus: 'Mega Ball', bonusMax: 24 },
@@ -98,37 +128,66 @@ export async function onRequestPost(context) {
   }
 
   const count = Math.min(5, Math.max(1, parseInt(body.count, 10) || 1));
+  const eKey = effortKey(body.effort);
+  const run = (emit) => (M.ensemble ? runPanel(env, G, count, body, eKey, emit) : runSingle(env, M, G, count, body, eKey, emit));
 
-  if (M.ensemble) {
-    try {
-      return json(await runPanel(env, G, count, body));
-    } catch (e) {
-      return json({ error: `Super Intelligence: ${String(e.message || e).slice(0, 300)}` }, 502);
-    }
-  }
-
-  const apiKey = keyFor(env, M.provider);
-  const prompt = buildPrompt(G, count, body);
-
+  // Streaming is opt-in so an older cached client keeps getting the plain JSON it expects.
+  if (body.stream) return ndjson(run, M.name);
   try {
-    // No opts on purpose — a single pick must send exactly the request that works today.
-    const callApi = (pPrompt) => callModel(M, apiKey, pPrompt);
-    const raw = await callApi(prompt);
-
-    const picks = extractJson(raw);
-    const check = validate(picks, G, count);
-    if (!check.ok) {
-      // one corrective retry, then give up honestly
-      const retryRaw = await callApi(prompt + `\n\nYour previous answer was invalid: ${check.reason}. Return corrected JSON only.`);
-      const retryPicks = extractJson(retryRaw);
-      const retryCheck = validate(retryPicks, G, count);
-      if (!retryCheck.ok) return json({ error: `${M.name} returned invalid picks (${retryCheck.reason}) — try again` }, 502);
-      return json({ ok: true, model: M.name, lines: retryPicks.lines.slice(0, count), note: retryPicks.note || '' });
-    }
-    return json({ ok: true, model: M.name, lines: picks.lines.slice(0, count), note: picks.note || '' });
+    return json(await run(() => {}));
   } catch (e) {
     return json({ error: `${M.name}: ${String(e.message || e).slice(0, 300)}` }, 502);
   }
+}
+
+/* ---------------- progress stream ----------------
+   Newline-delimited JSON rather than SSE: the client only needs one-way progress and
+   NDJSON needs no event-framing on either end. The Response is returned immediately
+   and written to as work happens, so the connection also acts as a keep-alive for the
+   long panel runs — the browser sees bytes instead of an idle socket. */
+function ndjson(run, label) {
+  const { readable, writable } = new TransformStream();
+  const writer = writable.getWriter();
+  const enc = new TextEncoder();
+  const send = (obj) => writer.write(enc.encode(JSON.stringify(obj) + '\n')).catch(() => {});
+
+  (async () => {
+    try {
+      const result = await run((ev) => send(ev));
+      await send({ t: 'done', ...result });
+    } catch (e) {
+      await send({ t: 'error', error: `${label}: ${String(e.message || e).slice(0, 300)}` });
+    } finally {
+      writer.close().catch(() => {});
+    }
+  })();
+
+  return new Response(readable, {
+    headers: { 'content-type': 'application/x-ndjson; charset=utf-8', 'cache-control': 'no-store', ...CORS },
+  });
+}
+
+async function runSingle(env, M, G, count, body, eKey, emit = () => {}) {
+  const apiKey = keyFor(env, M.provider);
+  const E = effortOf(eKey);
+  const prompt = buildPrompt(G, count, body, { effort: eKey });
+  const started = Date.now();
+  emit({ t: 'seat', slot: 'seat', state: 'start', name: M.name, role: 'Building your lines', effort: E.label });
+
+  const callApi = (pPrompt) => callModel(M, apiKey, pPrompt, { effort: E.anthropic, maxTokens: E.maxTokens, chatTokens: E.chatTokens });
+  let picks = extractJson(await callApi(prompt));
+  let check = validate(picks, G, count);
+  if (!check.ok) {
+    emit({ t: 'seat', slot: 'seat', state: 'retry', name: M.name, reason: check.reason });
+    picks = extractJson(await callApi(prompt + `\n\nYour previous answer was invalid: ${check.reason}. Return corrected JSON only.`));
+    check = validate(picks, G, count);
+    if (!check.ok) throw new Error(`returned invalid picks (${check.reason}) — try again`);
+  }
+  emit({ t: 'seat', slot: 'seat', state: 'done', name: M.name, ms: Date.now() - started, lines: picks.lines.length });
+  return {
+    ok: true, model: M.name, effort: E.label, lines: picks.lines.slice(0, count), note: picks.note || '',
+    seats: [{ name: M.name, read: picks.note || '', lines: picks.lines.slice(0, count) }],
+  };
 }
 
 /* ---------------- Super Intelligence: panel + adjudication ----------------
@@ -137,21 +196,37 @@ export async function onRequestPost(context) {
    the history. Round 2 — one model sees all of round 1 and picks the final lines,
    which is where cross-model agreement and disagreement actually gets used. A slow
    or broken provider drops out of the panel instead of failing the whole request. */
-async function runPanel(env, G, count, body) {
+async function runPanel(env, G, count, body, eKey, emit = () => {}) {
   const panel = PANEL_SEATS
     .map(([provider, key]) => ({ ...MODELS[key], apiKey: keyFor(env, provider) }))
     .filter((m) => m.apiKey);
   if (panel.length < 2) throw new Error('needs at least two AI providers configured');
 
+  const E = effortOf(panelEffort(eKey));
+  const deep = { effort: E.anthropic, maxTokens: E.maxTokens, chatTokens: E.chatTokens, deepThinking: true };
   const candidates = Math.min(5, count + 2);
-  const analystPrompt = buildPrompt(G, candidates, body, { panel: true });
+  const analystPrompt = buildPrompt(G, candidates, body, { panel: true, effort: panelEffort(eKey) });
 
+  emit({ t: 'phase', phase: 'panel', of: panel.length, effort: E.label, names: panel.map((m) => m.name) });
+  // slot distinguishes the chair's row from its own seat row — the chair is usually
+  // one of the seats, so keying status rows by model name alone would overwrite it.
+  for (const m of panel) emit({ t: 'seat', slot: 'seat', state: 'start', name: m.name, role: 'Analysing the draw history' });
+
+  // Progress is emitted from inside each task so a fast provider reports the moment it
+  // lands, instead of everyone appearing to finish together when allSettled resolves.
   const settled = await Promise.allSettled(panel.map(async (m) => {
-    const raw = await callModel(m, m.apiKey, analystPrompt, DEEP(100000));
-    const picks = extractJson(raw);
-    const check = validate(picks, G, candidates);
-    if (!check.ok) throw new Error(check.reason);
-    return { name: m.name, lines: picks.lines.slice(0, candidates), read: picks.note || '' };
+    const started = Date.now();
+    try {
+      const picks = extractJson(await callModel(m, m.apiKey, analystPrompt, { ...deep, timeoutMs: 100000 }));
+      const check = validate(picks, G, candidates);
+      if (!check.ok) throw new Error(check.reason);
+      const seat = { name: m.name, lines: picks.lines.slice(0, candidates), read: picks.note || '' };
+      emit({ t: 'seat', slot: 'seat', state: 'done', name: m.name, ms: Date.now() - started, lines: seat.lines.length, read: seat.read });
+      return seat;
+    } catch (e) {
+      emit({ t: 'seat', slot: 'seat', state: 'fail', name: m.name, ms: Date.now() - started, reason: String(e.message || e).slice(0, 120) });
+      throw e;
+    }
   }));
 
   const seats = settled.filter((s) => s.status === 'fulfilled').map((s) => s.value);
@@ -162,29 +237,33 @@ async function runPanel(env, G, count, body) {
   const chairModel = panel.find((m) => m.provider === 'anthropic' && seats.some((s) => s.name === m.name))
     || panel.find((m) => seats.some((s) => s.name === m.name));
   const panelNames = seats.map((s) => s.name);
+  const base = { ok: true, model: 'Super Intelligence', effort: E.label, panel: panelNames, seats, dropped };
 
   if (seats.length >= 2) {
+    const started = Date.now();
+    emit({ t: 'phase', phase: 'chair', name: chairModel.name });
+    emit({ t: 'seat', slot: 'chair', state: 'start', name: chairModel.name, role: `Adjudicating ${seats.length} panel answers` });
     try {
-      // Seats (100s) then chair (110s) stays inside the client's 240s leash for the panel.
-      const raw = await callModel(chairModel, chairModel.apiKey, buildChairPrompt(G, count, body, seats), DEEP(110000));
+      const raw = await callModel(chairModel, chairModel.apiKey, buildChairPrompt(G, count, body, seats), { ...deep, timeoutMs: 110000 });
       const picks = extractJson(raw);
       const check = validate(picks, G, count);
       if (check.ok) {
-        return {
-          ok: true, model: 'Super Intelligence', lines: picks.lines.slice(0, count),
-          note: picks.note || '', panel: panelNames, chair: chairModel.name, dropped,
-        };
+        emit({ t: 'seat', slot: 'chair', state: 'done', name: chairModel.name, ms: Date.now() - started, lines: picks.lines.length, role: 'Verdict' });
+        return { ...base, lines: picks.lines.slice(0, count), note: picks.note || '', chair: chairModel.name };
       }
-    } catch { /* fall through to the best single panel answer below */ }
+      emit({ t: 'seat', slot: 'chair', state: 'fail', name: chairModel.name, ms: Date.now() - started, reason: check.reason });
+    } catch (e) {
+      emit({ t: 'seat', slot: 'chair', state: 'fail', name: chairModel.name, ms: Date.now() - started, reason: String(e.message || e).slice(0, 120) });
+    }
   }
 
   // Chair failed or only one seat answered — return the strongest raw panel answer
   // rather than nothing, and say so plainly instead of passing it off as a verdict.
   const best = seats[0];
+  emit({ t: 'phase', phase: 'handoff', name: best.name });
   return {
-    ok: true, model: 'Super Intelligence', lines: best.lines.slice(0, count),
-    note: (seats.length >= 2 ? `Panel agreed to hand off: ${best.name}'s lines. ` : `Only ${best.name} answered. `) + (best.read || ''),
-    panel: panelNames, chair: null, dropped,
+    ...base, lines: best.lines.slice(0, count), chair: null,
+    note: (seats.length >= 2 ? `No verdict — using ${best.name}'s lines. ` : `Only ${best.name} answered. `) + (best.read || ''),
   };
 }
 
@@ -243,7 +322,9 @@ const OUTPUT_SHAPE = (G) => `Return ONLY JSON in exactly this shape. No markdown
 
 function buildPrompt(G, count, body, opts = {}) {
   const forPanel = !!opts.panel;
+  const guide = effortOf(opts.effort).guide;
   return `You are picking ${G.name} lottery lines for a New Jersey player, for entertainment.
+${guide ? '\n' + guide + '\n' : ''}
 
 ${GROUND_RULES}
 
@@ -313,10 +394,6 @@ function callModel(M, apiKey, prompt, opts = {}) {
   return callOpenAICompatible(M.provider, apiKey, M.id, prompt, opts);
 }
 
-// Deep-reasoning profile — the panel only. Its seats run concurrently, so a wedged
-// provider has to be cut loose or it holds up the other three.
-const DEEP = (timeoutMs) => ({ effort: 'high', maxTokens: 16000, deepThinking: true, timeoutMs });
-
 // Returns undefined when the runtime has no AbortSignal.timeout; `signal: undefined`
 // is a valid fetch init, so the worst case is losing the deadline, not the request.
 const withTimeout = (ms) => {
@@ -385,8 +462,8 @@ async function callOpenAICompatible(provider, apiKey, model, prompt, opts = {}) 
     response_format: { type: 'json_object' },
   };
   // OpenAI reasoning models take max_completion_tokens; xAI takes max_tokens.
-  // 4000 is the known-good single-model value; the panel raises it for deeper reasoning.
-  const cap = opts.maxTokens || 4000;
+  // chatTokens is separate from Anthropic's maxTokens — 4000 is the known-good value here.
+  const cap = opts.chatTokens || 4000;
   if (provider === 'openai') body.max_completion_tokens = cap;
   else body.max_tokens = cap;
 

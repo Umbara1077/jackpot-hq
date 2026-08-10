@@ -260,6 +260,7 @@ const DEFAULTS = {
   alerts: { enabled: false, lead: 30, games: { pb: true, mm: true, m4l: true, p6: false, jc5: false, p3: false, p4: false }, jpPB: 500, jpMM: 300 },
   theme: 'auto', lastSync: 0,
   ticketsAt: 0, backupAt: 0, // last ticket saved / last backup taken — drives the ⚠ backup nudge
+  aiEffort: 'balanced',      // how hard the AI works; 'balanced' is the known-good default
 };
 let S;
 try { S = Object.assign({}, DEFAULTS, JSON.parse(localStorage.getItem('jhq') || '{}')); }
@@ -776,7 +777,17 @@ const AI_FALLBACK_MODELS = {
 const AI_BLURB = {
   super: 'Every configured maker answers in parallel, then one adjudicates all of them',
 };
-let aiModel = 'geminiflash', aiNote = null;
+let aiModel = 'geminiflash', aiNote = null, aiDetail = null;
+/* Effort selector. Mirrors the server's profiles — `balanced` is the default because it
+   is the exact request that works in production. `ms` is how long the client waits. */
+const AI_EFFORTS = [
+  { k: 'quick', label: 'Quick', blurb: 'Fastest. Good enough for a casual line.', ms: 60000 },
+  { k: 'balanced', label: 'Balanced', blurb: 'The default — solid reasoning, normal wait.', ms: 120000 },
+  { k: 'deep', label: 'Deep', blurb: 'Works the history properly. Slower, costs more.', ms: 210000 },
+  { k: 'max', label: 'Maximum', blurb: 'Explores widest and stress-tests every line. Slowest.', ms: 300000 },
+];
+const aiEffortKey = () => (AI_EFFORTS.some(e => e.k === S.aiEffort) ? S.aiEffort : 'balanced');
+const aiEffortOf = () => AI_EFFORTS.find(e => e.k === aiEffortKey());
 function aiEndpoint() {
   if (typeof window !== 'undefined' && window.claude) return null; // hosted artifact: platform blocks outside calls
   if (location.protocol === 'file:') {
@@ -879,7 +890,37 @@ function aiPanelHtml() {
   } else if (!AI.ok) {
     status = `<div class="chip" style="margin-top:12px">AI endpoint unreachable</div>`;
   }
-  return `<div style="margin-top:4px">${aiModelTriggerHtml()}</div>${status}`;
+  const cur = aiEffortKey();
+  const effort = `<div class="aieffort" id="aiEffort">
+    <div class="aieffort-head"><b>Effort</b><span class="muted small">${esc(aiEffortOf().blurb)}</span></div>
+    <div class="aieffort-row">${AI_EFFORTS.map(e =>
+      `<button type="button" data-eff="${e.k}" class="effbtn ${e.k === cur ? 'on' : ''}">${esc(e.label)}</button>`).join('')}</div>
+    ${aiModel === 'super' ? '<p class="muted small" style="margin:7px 0 0">Super Intelligence always runs at least Deep — its whole point is depth.</p>' : ''}
+  </div>`;
+  return `<div style="margin-top:4px">${aiModelTriggerHtml()}</div>${effort}${status}`;
+}
+function wireEffortButtons(root) {
+  $$('#aiEffort .effbtn', root).forEach((b) => {
+    b.onclick = () => { S.aiEffort = b.dataset.eff; save(); renderLab(); };
+  });
+}
+/* The reasoning the user asked to see: each model's read of the history and the lines
+   it proposed, plus who chaired. Collapsed by default so it never buries the numbers. */
+function aiReasoningHtml() {
+  if (!aiDetail || !aiDetail.seats || !aiDetail.seats.length) return '';
+  const multi = aiDetail.seats.length > 1;
+  const G = GAMES[labGame];
+  const body = aiDetail.seats.map((s) => `<div class="aireason-seat">
+    <b>${esc(s.name)}${aiDetail.chair === s.name ? ' <span class="chairtag">chaired</span>' : ''}</b>
+    ${s.read ? `<p class="muted small">${esc(s.read)}</p>` : ''}
+    ${Array.isArray(s.lines) && s.lines.length ? `<ul class="aireason-lines">${s.lines.map((L) => {
+      const nums = Array.isArray(L.numbers) ? (G.digits ? L.numbers.join('') : L.numbers.join(' ')) : '';
+      return `<li><code>${esc(nums)}${L.bonus != null ? ' +' + L.bonus : ''}</code>${L.why ? ' — ' + esc(L.why) : ''}</li>`;
+    }).join('')}</ul>` : ''}
+  </div>`).join('');
+  return `<details class="aireason"><summary>${multi ? `How the ${aiDetail.seats.length} models reasoned` : 'How it reasoned'}${aiDetail.dropped ? ` · ${aiDetail.dropped} dropped out` : ''}</summary>
+    <p class="muted small" style="margin:2px 0 8px">${esc(aiDetail.effort || '')} effort${aiDetail.chair ? ` · ${esc(aiDetail.chair)} made the final call` : ''}</p>
+    ${body}</details>`;
 }
 function askPasscode() {
   openSheet(`<h3>Passcode</h3>
@@ -896,13 +937,14 @@ async function aiGenerate() {
   if (!AI.models[aiModel]?.available) return toast(aiModelName(aiModel) + ' is unavailable');
   const name = aiModelName(aiModel);
   const panel = aiModel === 'super';
+  const E = aiEffortOf();
   const gb = $('#genbtn'); if (gb) { gb.disabled = true; gb.textContent = panel ? 'The panel is deliberating…' : name + ' is thinking…'; }
   openGenLoading(
     panel ? 'The panel is deliberating…' : name + ' is thinking…',
     panel
-      ? 'Every maker is answering in parallel, then one adjudicates all of them. This takes longer than a single model.'
-      : 'Reading recent draws, matching the typical draw profile, and dodging crowded numbers.',
-    aiModel);
+      ? 'Every maker answers in parallel, then one adjudicates all of them.'
+      : `${E.label} effort · matching the typical draw profile and dodging crowded numbers.`,
+    aiModel, true);
   const recent = (RES[labGame] || []).slice(-15).map(r => G.digits
     ? `${r.d}${r.t ? '/' + r.t : ''}: ${r.n}${r.f ? ' FB' + r.f : ''}`
     : `${r.d}: ${r.n.join(' ')}${r.b != null ? ' +' + r.b : ''}`);
@@ -916,17 +958,27 @@ async function aiGenerate() {
   const J = (G.jackpotSeed || G.fixedJackpot) ? jackpotOf(labGame) : null;
   // The panel runs two rounds across several providers, so it needs a longer leash
   // than a single model — the server bounds each individual call on its own side.
-  const ctrl = new AbortController(); const timer = setTimeout(() => ctrl.abort(), panel ? 240000 : 120000);
+  // Budget comes from the chosen effort; the panel runs two rounds so it gets more.
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), panel ? Math.max(240000, E.ms) : E.ms);
   try {
     const r = await fetch(ep, {
       method: 'POST',
       headers: { 'content-type': 'application/json', ...(S.aiPass ? { 'x-app-pass': S.aiPass } : {}) },
-      body: JSON.stringify({ model: aiModel, game: labGame, count: Math.min(5, labCount), recent, hot, cold, jackpot: J ? fmtMoney(J.amt) : null }),
+      body: JSON.stringify({
+        model: aiModel, game: labGame, count: Math.min(5, labCount),
+        effort: aiEffortKey(), stream: true,
+        recent, hot, cold, jackpot: J ? fmtMoney(J.amt) : null,
+      }),
       signal: ctrl.signal,
     });
-    const j = await r.json().catch(() => ({ error: 'bad response from endpoint' }));
     if (r.status === 401) { closePickModal(); askPasscode(); return; }
-    if (!r.ok || !j.ok) { closePickModal(); toast(j.error || 'AI error ' + r.status); return; }
+
+    const j = /ndjson/.test(r.headers.get('content-type') || '')
+      ? await readAiStream(r)                                     // live progress
+      : await r.json().catch(() => ({ error: 'bad response from endpoint' })); // plain-JSON fallback
+
+    if (!r.ok || !j || !j.ok) { closePickModal(); toast((j && j.error) || 'AI error ' + r.status); return; }
     labLines = j.lines.map(L => G.digits
       ? ({ n: L.numbers.join(''), why: L.why })
       : ({ n: L.numbers, b: (G.matrix.bonusMax && !G.matrix.bullseye) ? L.bonus : null, why: L.why }));
@@ -935,14 +987,54 @@ async function aiGenerate() {
       ? `${j.model} (${j.panel.join(' · ')}${j.chair ? ` → ${j.chair} chaired` : ''}${j.dropped ? ` · ${j.dropped} dropped out` : ''})`
       : j.model;
     aiNote = j.note ? `${who} — ${j.note}` : who;
+    aiDetail = { model: j.model, effort: j.effort || E.label, chair: j.chair || null, dropped: j.dropped || 0, seats: Array.isArray(j.seats) ? j.seats : [], note: j.note || '' };
     paintLines({ popup: true });
   } catch (e) {
     closePickModal();
-    toast(e.name === 'AbortError' ? 'The AI took too long — try again' : 'AI request failed — check connection');
+    toast(e.name === 'AbortError' ? 'The AI took too long — try a lower effort' : 'AI request failed — check connection');
   } finally {
     clearTimeout(timer);
     const b = $('#genbtn'); if (b) { b.disabled = false; b.textContent = genLabel(); }
   }
+}
+/* Reads the NDJSON progress stream, painting each event into the status box, and
+   resolves with the final result object. */
+async function readAiStream(r) {
+  const reader = r.body.getReader();
+  const dec = new TextDecoder();
+  let buf = '', out = null;
+  for (;;) {
+    const { value, done } = await reader.read();
+    if (done) break;
+    buf += dec.decode(value, { stream: true });
+    let nl;
+    while ((nl = buf.indexOf('\n')) >= 0) {
+      const line = buf.slice(0, nl).trim();
+      buf = buf.slice(nl + 1);
+      if (!line) continue;
+      let ev; try { ev = JSON.parse(line); } catch { continue; }
+      if (ev.t === 'done') out = ev;
+      else if (ev.t === 'error') out = { ok: false, error: ev.error };
+      else applyAiProgress(ev);
+    }
+  }
+  return out || { ok: false, error: 'the stream ended before any picks arrived' };
+}
+function applyAiProgress(ev) {
+  if (ev.t === 'phase') {
+    if (ev.phase === 'panel') genSetTitle('Round 1 — the panel is analysing', `${ev.of} models working in parallel at ${ev.effort} effort.`);
+    if (ev.phase === 'chair') genSetTitle('Round 2 — adjudicating', `${ev.name} is weighing every answer against the others.`);
+    if (ev.phase === 'handoff') genSetTitle('No verdict reached', `Falling back to ${ev.name}'s lines.`);
+    return;
+  }
+  if (ev.t !== 'seat') return;
+  const detail = ev.state === 'done' ? `${ev.role || 'answered'} · ${ev.lines} line${ev.lines === 1 ? '' : 's'}${ev.ms ? ' · ' + (ev.ms / 1000).toFixed(1) + 's' : ''}`
+    : ev.state === 'fail' ? `dropped out — ${ev.reason || 'failed'}`
+    : ev.state === 'retry' ? `retrying — ${ev.reason || 'invalid answer'}`
+    : (ev.role || 'working…') + (ev.effort ? ` · ${ev.effort} effort` : '');
+  // Key by slot, not name: the chair is normally also a seat, so keying by model name
+  // alone makes its adjudication row overwrite its own round-1 row.
+  genStatusRow(`${ev.slot || 'seat'}|${ev.name}`, ev.state, ev.name, detail);
 }
 function digitGen(g, kind) {
   const D = GAMES[g].digits; const rows = RES[g] || [];
@@ -1189,7 +1281,8 @@ function renderLab() {
   ${aiOn
       ? `<div id="aipanel">${aiPanelHtml()}</div>${truthHtml}${ctlHtml}<div class="sublabel">More ways to pick</div>${gridHtml}`
       : `${gridHtml}${truthHtml}${ctlHtml}`}`}`;
-  $$('.gpick button:not([data-ai])', v).forEach(b => { if (b.dataset.g) b.onclick = () => { labGame = b.dataset.g; labLines = []; aiNote = null; manualSel = []; manualBonus = null; renderLab(); }; });
+  wireEffortButtons(v);
+  $$('.gpick button:not([data-ai])', v).forEach(b => { if (b.dataset.g) b.onclick = () => { labGame = b.dataset.g; labLines = []; aiNote = null; aiDetail = null; manualSel = []; manualBonus = null; renderLab(); }; });
   // Strategy tiles + featured AI Pick button (data-s) — without this the AI panel never opens
   $$('[data-s]', v).forEach(b => {
     b.onclick = () => {
@@ -1250,6 +1343,7 @@ function linesResultHtml() {
       ${L.why ? `<div class="aiwhy">“${esc(L.why)}”</div>` : ''}</div>`;
   }).join('') + `
   ${aiNote ? `<div class="chip" style="margin-top:11px;color:var(--gold);border-color:var(--gold-deep)">🤖 ${esc(aiNote)}</div>` : ''}
+  ${aiReasoningHtml()}
   <div class="rowflex" style="margin-top:13px">
     <button class="gbtn" id="saveticket" style="flex:2;min-width:180px">Save as ticket</button>
     <button class="obtn" id="copylines">Copy</button>
@@ -2034,7 +2128,7 @@ function closePickModal(keepScrim) {
   m.innerHTML = '';
   if (!keepScrim && !$('#sheet').classList.contains('on')) $('#scrim').classList.remove('on');
 }
-function openGenLoading(title, sub, modelKey) {
+function openGenLoading(title, sub, modelKey, withStatus) {
   const mark = modelKey
     ? aiLogo(modelKey)
     : `<span class="genload-mark" aria-hidden="true">$</span>`;
@@ -2043,10 +2137,31 @@ function openGenLoading(title, sub, modelKey) {
       <div class="genload-orb"></div>
       <div class="genload-orb-core">${mark}</div>
     </div>
-    <b>${esc(title)}</b>
-    <p>${esc(sub || 'Hang tight — your lines will pop up here.')}</p>
+    <b id="genTitle">${esc(title)}</b>
+    <p id="genSub">${esc(sub || 'Hang tight — your lines will pop up here.')}</p>
+    ${withStatus ? '<div class="genstatus" id="genStatus"></div>' : ''}
     <div class="genload-dots" aria-hidden="true"><i></i><i></i><i></i></div>
   </div>`);
+}
+/* Live progress. The server streams one JSON object per line as work happens, so this
+   shows which model is doing what instead of a spinner that reveals nothing. */
+function genSetTitle(title, sub) {
+  const t = $('#genTitle'); if (t) t.textContent = title;
+  const s = $('#genSub'); if (s && sub != null) s.textContent = sub;
+}
+function genStatusRow(id, state, name, detail) {
+  const box = $('#genStatus'); if (!box) return;
+  const icon = { start: '<i class="gs-spin"></i>', done: '<i class="gs-ok">✓</i>', fail: '<i class="gs-bad">✕</i>', retry: '<i class="gs-warn">↻</i>' }[state] || '';
+  let row = box.querySelector(`[data-row="${id}"]`);
+  if (!row) {
+    row = document.createElement('div');
+    row.className = 'gsrow';
+    row.dataset.row = id;
+    box.appendChild(row);
+  }
+  row.className = 'gsrow gs-' + state;
+  row.innerHTML = `${icon}<b>${esc(name)}</b><span>${esc(detail || '')}</span>`;
+  box.scrollTop = box.scrollHeight;
 }
 $('#scrim').addEventListener('click', () => { closePickModal(); closeSheet(); });
 function toast(msg, gold) {

@@ -783,6 +783,34 @@ details.rt p{color:var(--ink2); font-size:13px; margin:9px 0 2px; line-height:1.
   #view-budget.on > .footnote{grid-column:1/-1}
 }
 /* ============ GRAPHICAL LOGIN GATE ============ */
+/* ---------- AI: live status, effort selector, reasoning ---------- */
+.genstatus{margin:12px 0 2px; width:100%; max-height:190px; overflow-y:auto; overscroll-behavior:contain; text-align:left; display:flex; flex-direction:column; gap:5px}
+.gsrow{display:flex; align-items:center; gap:8px; font-size:12px; padding:6px 9px; border-radius:11px; background:color-mix(in srgb, var(--card-solid) 60%, transparent); border:1px solid var(--card-edge)}
+.gsrow b{font-weight:700; white-space:nowrap}
+.gsrow span{color:var(--ink3); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; min-width:0}
+.gsrow i{font-style:normal; flex:none; width:15px; text-align:center}
+.gs-ok{color:var(--ok)} .gs-bad{color:var(--bad)} .gs-warn{color:var(--warn,#e0a33c)}
+.gsrow.gs-done{border-color:color-mix(in srgb, var(--ok) 35%, transparent)}
+.gsrow.gs-fail{opacity:.62}
+.gs-spin{display:inline-block; width:11px; height:11px; border-radius:50%; border:2px solid var(--card-edge); border-top-color:var(--gold); animation:gsspin .7s linear infinite}
+@keyframes gsspin{to{transform:rotate(360deg)}}
+@media(prefers-reduced-motion:reduce){ .gs-spin{animation:none; border-top-color:var(--card-edge)} }
+
+.aieffort{margin-top:11px; padding:11px 12px; border-radius:16px; background:color-mix(in srgb, var(--card-solid) 55%, transparent); border:1px solid var(--card-edge)}
+.aieffort-head{display:flex; align-items:baseline; gap:9px; flex-wrap:wrap; margin-bottom:9px}
+.aieffort-row{display:flex; gap:6px; overflow-x:auto; overscroll-behavior-x:contain; scrollbar-width:none}
+.effbtn{flex:1 1 0; min-width:66px; font:inherit; font-size:12px; font-weight:700; padding:8px 6px; border-radius:11px; border:1px solid var(--card-edge); background:transparent; color:var(--ink3); cursor:pointer; transition:all .16s ease}
+.effbtn.on{color:var(--gold); border-color:var(--gold-deep); background:rgba(232,184,75,.12)}
+
+.aireason{margin-top:11px; border:1px solid var(--card-edge); border-radius:14px; background:color-mix(in srgb, var(--card-solid) 45%, transparent); padding:9px 12px}
+.aireason summary{cursor:pointer; font-weight:700; font-size:13px; color:var(--ink2)}
+.aireason-seat{margin-top:10px; padding-top:9px; border-top:1px solid var(--card-edge)}
+.aireason-seat:first-of-type{border-top:0; padding-top:2px}
+.aireason-lines{margin:6px 0 0; padding-left:16px; font-size:12px; color:var(--ink2)}
+.aireason-lines li{margin:3px 0}
+.aireason-lines code{font-family:ui-monospace,monospace; color:var(--gold); font-size:11.5px}
+.chairtag{font-size:9.5px; letter-spacing:.14em; text-transform:uppercase; color:var(--gold); border:1px solid var(--gold-deep); border-radius:99px; padding:1px 7px; margin-left:5px}
+
 /* ---------- login gate ----------
    Every colour below is a gate-local token, deliberately NOT --ink/--gold. The gate paints
    its own backdrop, so borrowing the theme's text colours put near-black type on the
