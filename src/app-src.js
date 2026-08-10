@@ -1021,6 +1021,7 @@ async function readAiStream(r) {
   return out || { ok: false, error: 'the stream ended before any picks arrived' };
 }
 function applyAiProgress(ev) {
+  if (ev.t === 'tick') { genPulse(ev.ms); return; }
   if (ev.t === 'phase') {
     if (ev.phase === 'panel') genSetTitle('Round 1 — the panel is analysing', `${ev.of} models working in parallel at ${ev.effort} effort.`);
     if (ev.phase === 'chair') genSetTitle('Round 2 — adjudicating', `${ev.name} is weighing every answer against the others.`);
@@ -2139,7 +2140,7 @@ function openGenLoading(title, sub, modelKey, withStatus) {
     </div>
     <b id="genTitle">${esc(title)}</b>
     <p id="genSub">${esc(sub || 'Hang tight — your lines will pop up here.')}</p>
-    ${withStatus ? '<div class="genstatus" id="genStatus"></div>' : ''}
+    ${withStatus ? '<div class="genstatus" id="genStatus"></div><div class="genpulse" id="genPulse"><i></i><span>connecting…</span></div>' : ''}
     <div class="genload-dots" aria-hidden="true"><i></i><i></i><i></i></div>
   </div>`);
 }
@@ -2159,9 +2160,27 @@ function genStatusRow(id, state, name, detail) {
     row.dataset.row = id;
     box.appendChild(row);
   }
+  // stamp when this model started so the heartbeat can tick its own elapsed time
+  if (state === 'start') row.dataset.t0 = String(Date.now());
   row.className = 'gsrow gs-' + state;
-  row.innerHTML = `${icon}<b>${esc(name)}</b><span>${esc(detail || '')}</span>`;
+  row.innerHTML = `${icon}<b>${esc(name)}</b><span>${esc(detail || '')}<em class="gs-el"></em></span>`;
   box.scrollTop = box.scrollHeight;
+}
+/* Server heartbeat. The elapsed numbers come from the tab's clock, but they only ever
+   advance when a beat actually arrives — so if the connection dies the clock freezes
+   rather than cheerfully counting up next to a request that is already gone. */
+function genPulse(ms) {
+  const p = $('#genPulse');
+  if (p) {
+    const s = p.querySelector('span');
+    if (s) s.textContent = `live · ${Math.round(ms / 1000)}s elapsed`;
+    p.classList.add('on');
+  }
+  $$('#genStatus .gs-start').forEach((row) => {
+    const t0 = +row.dataset.t0 || 0;
+    const el = row.querySelector('.gs-el');
+    if (t0 && el) el.textContent = ` · ${Math.round((Date.now() - t0) / 1000)}s`;
+  });
 }
 $('#scrim').addEventListener('click', () => { closePickModal(); closeSheet(); });
 function toast(msg, gold) {

@@ -29,10 +29,20 @@ const MODELS = {
   gemini2flash: { provider: 'google', id: 'gemini-3.5-flash', name: 'Gemini 3.5 Flash' },
 };
 
-// One seat per provider, strongest model first — a panel of four near-identical
-// Geminis would just agree with itself.
+/* Who sits on the panel. Order matters twice: seats are listed in this order, and the
+   chair is the first seat in this list that actually answered — so the most capable
+   model available does the adjudicating.
+
+   Anthropic gets two seats because Fable 5 and Opus 5 are genuinely different models
+   with different training, not near-duplicates. The rule this list follows is "no two
+   seats that would just agree with each other" — which is why Google gets one seat
+   (3.1 Pro) rather than all three Geminis, and OpenAI gets Sol rather than Sol + Terra. */
 const PANEL_SEATS = [
-  ['anthropic', 'opus'], ['openai', 'sol'], ['xai', 'grok'], ['google', 'geminipro'],
+  ['anthropic', 'fable'],   // most capable → chairs when configured
+  ['anthropic', 'opus'],
+  ['openai', 'sol'],
+  ['xai', 'grok'],
+  ['google', 'geminipro'],
 ];
 const PROVIDERS = ['anthropic', 'openai', 'xai', 'google'];
 
@@ -152,12 +162,19 @@ function ndjson(run, label) {
   const send = (obj) => writer.write(enc.encode(JSON.stringify(obj) + '\n')).catch(() => {});
 
   (async () => {
+    const t0 = Date.now();
+    // Heartbeat. A model can think for a minute with nothing to report, and a silent
+    // socket is indistinguishable from a dead one — this proves the run is still alive
+    // and gives the loading screen a clock that is coming from the server, not the tab.
+    const beat = setInterval(() => send({ t: 'tick', ms: Date.now() - t0 }), 3000);
     try {
+      send({ t: 'tick', ms: 0 }); // first beat immediately, so the clock starts at once
       const result = await run((ev) => send(ev));
-      await send({ t: 'done', ...result });
+      await send({ t: 'done', ms: Date.now() - t0, ...result });
     } catch (e) {
       await send({ t: 'error', error: `${label}: ${String(e.message || e).slice(0, 300)}` });
     } finally {
+      clearInterval(beat);
       writer.close().catch(() => {});
     }
   })();
@@ -233,9 +250,10 @@ async function runPanel(env, G, count, body, eKey, emit = () => {}) {
   if (!seats.length) throw new Error('every model on the panel failed — try a single model');
   const dropped = panel.length - seats.length;
 
-  // Adjudicate. Anthropic chairs when configured; otherwise the first seat that answered.
-  const chairModel = panel.find((m) => m.provider === 'anthropic' && seats.some((s) => s.name === m.name))
-    || panel.find((m) => seats.some((s) => s.name === m.name));
+  // The chair is simply the first seat in PANEL_SEATS order that answered — that list is
+  // ordered most-capable-first, so Fable 5 chairs when it is configured and responded,
+  // then Opus 5, then whoever else is left. A model that dropped out can never chair.
+  const chairModel = panel.find((m) => seats.some((s) => s.name === m.name));
   const panelNames = seats.map((s) => s.name);
   const base = { ok: true, model: 'Super Intelligence', effort: E.label, panel: panelNames, seats, dropped };
 

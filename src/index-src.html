@@ -796,6 +796,13 @@ details.rt p{color:var(--ink2); font-size:13px; margin:9px 0 2px; line-height:1.
 @keyframes gsspin{to{transform:rotate(360deg)}}
 @media(prefers-reduced-motion:reduce){ .gs-spin{animation:none; border-top-color:var(--card-edge)} }
 
+.gs-el{font-style:normal; opacity:.75}
+.genpulse{display:flex; align-items:center; justify-content:center; gap:7px; margin-top:9px; font-size:11px; letter-spacing:.1em; text-transform:uppercase; font-weight:700; color:var(--ink3); opacity:.55; transition:opacity .3s ease}
+.genpulse.on{opacity:1; color:var(--ok)}
+.genpulse i{width:7px; height:7px; border-radius:50%; background:currentColor; animation:gspulse 1.6s ease-in-out infinite}
+@keyframes gspulse{0%,100%{opacity:.35; transform:scale(.8)} 50%{opacity:1; transform:scale(1.15)}}
+@media(prefers-reduced-motion:reduce){ .genpulse i{animation:none} }
+
 .aieffort{margin-top:11px; padding:11px 12px; border-radius:16px; background:color-mix(in srgb, var(--card-solid) 55%, transparent); border:1px solid var(--card-edge)}
 .aieffort-head{display:flex; align-items:baseline; gap:9px; flex-wrap:wrap; margin-bottom:9px}
 .aieffort-row{display:flex; gap:6px; overflow-x:auto; overscroll-behavior-x:contain; scrollbar-width:none}
