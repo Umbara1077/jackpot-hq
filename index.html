@@ -1469,7 +1469,7 @@ const STRATS = {
     },
   },
   manual: { name: 'My Numbers', ico: '✍️', truth: 'Pick your own — the Lab grades the crowd-factor as you tap.', desc: 'Tap the board to build your line and get instant analysis.', manual: true },
-  ai: { name: 'AI Pick', ico: '✨', truth: 'No AI can beat randomness — these models build smart low-crowd lines from the real draw history and explain their thinking.', desc: 'Claude Fable 5, Opus 5, Grok 4.5 or GPT-5.6 reasons over the real draw data and explains every pick it makes.', ai: true },
+  ai: { name: 'AI Pick', ico: '✨', truth: 'No AI can beat randomness. What they can do: shape a line that matches the profile of real winning draws, and keep it off the numbers everyone else plays — that part is worth real money if it hits.', desc: 'Super Intelligence puts every maker on a panel and has one adjudicate them — or pick a single model. Each explains every line it builds.', ai: true },
 };
 
 /* official maker logos: Claude spark for Anthropic models, OpenAI blossom for GPT,
@@ -1483,7 +1483,19 @@ const LOGO_PATHS = {
 function aiLogo(key) {
   const tile = (bg, fg, path) => `<svg viewBox="0 0 40 40"><rect width="40" height="40" rx="10" fill="${bg}"/><path transform="translate(8 8)" fill="${fg}" d="${LOGO_PATHS[path]}"/></svg>`;
   const geminiTile = `<svg viewBox="0 0 40 40"><rect width="40" height="40" rx="10" fill="#131722"/><defs><linearGradient id="gemGrad" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#4285F4"/><stop offset="35%" stop-color="#9B51E0"/><stop offset="70%" stop-color="#EA4335"/><stop offset="100%" stop-color="#FBBC05"/></linearGradient></defs><path fill="url(#gemGrad)" d="${LOGO_PATHS.gemini}"/></svg>`;
+  // Super Intelligence isn't one maker's model, so it gets its own mark: four nodes
+  // (one per provider) converging on a single point.
+  const superTile = `<svg viewBox="0 0 40 40"><rect width="40" height="40" rx="10" fill="#0d0b1a"/>
+    <defs><linearGradient id="superGrad" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#ffd66b"/><stop offset="45%" stop-color="#ff8ad8"/><stop offset="100%" stop-color="#7ea8ff"/>
+    </linearGradient></defs>
+    <g stroke="url(#superGrad)" stroke-width="1.6" opacity=".85">
+      <path d="M20 20 L10 10M20 20 L30 10M20 20 L10 30M20 20 L30 30"/>
+    </g>
+    <g fill="url(#superGrad)"><circle cx="10" cy="10" r="3"/><circle cx="30" cy="10" r="3"/><circle cx="10" cy="30" r="3"/><circle cx="30" cy="30" r="3"/></g>
+    <circle cx="20" cy="20" r="4.6" fill="#0d0b1a" stroke="url(#superGrad)" stroke-width="2"/></svg>`;
   const M = {
+    super: superTile,
     fable: tile('#d97757', '#fdf6ee', 'claude'),
     opus: tile('#b85c3f', '#fdf6ee', 'claude'),
     grok: tile('#000', '#fff', 'x'),
@@ -1497,10 +1509,11 @@ function aiLogo(key) {
   return `<span class="ailogo">${M[key] || M.fable}</span>`;
 }
 const AI_MAKER = {
-  fable: 'Anthropic', opus: 'Anthropic', grok: 'xAI', sol: 'OpenAI', terra: 'OpenAI',
+  super: 'Every maker', fable: 'Anthropic', opus: 'Anthropic', grok: 'xAI', sol: 'OpenAI', terra: 'OpenAI',
   geminipro: 'Google', geminiflash: 'Google', gemini2flash: 'Google', gemini: 'Google',
 };
 const AI_PROVIDERS = [
+  { id: 'panel', name: 'Super Intelligence', brand: 'All makers', logo: 'super', models: ['super'] },
   { id: 'anthropic', name: 'Anthropic', brand: 'Claude', logo: 'fable', models: ['fable', 'opus'] },
   { id: 'openai', name: 'OpenAI', brand: 'GPT', logo: 'sol', models: ['sol', 'terra'] },
   { id: 'xai', name: 'xAI', brand: 'Grok', logo: 'grok', models: ['grok'] },
@@ -1726,9 +1739,14 @@ function openAccount() {
 let AI = { checked: false, ok: false, models: {}, passReq: false };
 /* shown before the server has answered (or when it can't) so the picker is always visible */
 const AI_FALLBACK_MODELS = {
+  super: { name: 'Super Intelligence' },
   fable: { name: 'Claude Fable 5' }, opus: { name: 'Claude Opus 5' }, grok: { name: 'Grok 4.5' },
   sol: { name: 'GPT-5.6 Sol' }, terra: { name: 'GPT-5.6 Terra' },
   geminipro: { name: 'Gemini 3.1 Pro' }, geminiflash: { name: 'Gemini 3.6 Flash' }, gemini2flash: { name: 'Gemini 3.5 Flash' },
+};
+// Needs two providers to exist at all, so it's the top pick when the site has them.
+const AI_BLURB = {
+  super: 'Every configured maker answers in parallel, then one adjudicates all of them',
 };
 let aiModel = 'geminiflash', aiNote = null;
 function aiEndpoint() {
@@ -1762,7 +1780,10 @@ async function aiProbe() {
     const models = mergeAiModels(j.models || {});
     AI = { checked: true, ok: !!j.ok, models, passReq: !!j.passcodeRequired };
     const avail = Object.keys(models).filter(k => models[k].available);
-    if (avail.length && !avail.includes(aiModel)) aiModel = avail.includes('geminiflash') ? 'geminiflash' : avail[0];
+    // Prefer the panel when the site can actually run one, then the cheap default.
+    if (avail.length && !avail.includes(aiModel)) {
+      aiModel = avail.includes('super') ? 'super' : avail.includes('geminiflash') ? 'geminiflash' : avail[0];
+    }
   } catch { AI = { checked: true, ok: false, models: mergeAiModels(null), passReq: false }; }
   if (curView === 'lab') renderLab();
 }
@@ -1787,9 +1808,12 @@ function openAiModelPicker() {
   const groups = AI_PROVIDERS.map((p) => {
     const buttons = p.models.map((k) => {
       const m = modelsMap[k] || { name: aiModelName(k), available: false };
+      const sub = live && !m.available
+        ? (k === 'super' ? 'Needs two AI providers configured' : 'Unavailable on this site')
+        : (AI_BLURB[k] || esc(p.brand) + ' · ' + esc(p.name));
       return `<button type="button" data-ai="${k}" class="aimodel ${k === aiModel ? 'on' : ''}" ${live && !m.available ? 'disabled' : ''}>
         ${aiLogo(k)}
-        <span class="aimeta"><b class="grad">${esc(m.name)}</b><small>${live && !m.available ? 'Unavailable on this site' : esc(p.brand) + ' · ' + esc(p.name)}</small></span>
+        <span class="aimeta"><b class="grad">${esc(m.name)}</b><small>${esc(sub)}</small></span>
       </button>`;
     }).join('');
     return `<div class="aiprov" data-p="${p.id}">
@@ -1842,8 +1866,14 @@ async function aiGenerate() {
   if (!aiModel) return toast('Pick a model');
   if (!AI.models[aiModel]?.available) return toast(aiModelName(aiModel) + ' is unavailable');
   const name = aiModelName(aiModel);
-  const gb = $('#genbtn'); if (gb) { gb.disabled = true; gb.textContent = name + ' is thinking…'; }
-  openGenLoading(name + ' is thinking…', 'Reading recent draws and shaping low-crowd lines.', aiModel);
+  const panel = aiModel === 'super';
+  const gb = $('#genbtn'); if (gb) { gb.disabled = true; gb.textContent = panel ? 'The panel is deliberating…' : name + ' is thinking…'; }
+  openGenLoading(
+    panel ? 'The panel is deliberating…' : name + ' is thinking…',
+    panel
+      ? 'Every maker is answering in parallel, then one adjudicates all of them. This takes longer than a single model.'
+      : 'Reading recent draws, matching the typical draw profile, and dodging crowded numbers.',
+    aiModel);
   const recent = (RES[labGame] || []).slice(-15).map(r => G.digits
     ? `${r.d}${r.t ? '/' + r.t : ''}: ${r.n}${r.f ? ' FB' + r.f : ''}`
     : `${r.d}: ${r.n.join(' ')}${r.b != null ? ' +' + r.b : ''}`);
@@ -1855,7 +1885,9 @@ async function aiGenerate() {
     cold = [...items].sort((a, b) => b.gap - a.gap).slice(0, 5).map(x => x.n);
   }
   const J = (G.jackpotSeed || G.fixedJackpot) ? jackpotOf(labGame) : null;
-  const ctrl = new AbortController(); const timer = setTimeout(() => ctrl.abort(), 120000);
+  // The panel runs two rounds across several providers, so it needs a longer leash
+  // than a single model — the server bounds each individual call on its own side.
+  const ctrl = new AbortController(); const timer = setTimeout(() => ctrl.abort(), panel ? 240000 : 120000);
   try {
     const r = await fetch(ep, {
       method: 'POST',
@@ -1869,7 +1901,11 @@ async function aiGenerate() {
     labLines = j.lines.map(L => G.digits
       ? ({ n: L.numbers.join(''), why: L.why })
       : ({ n: L.numbers, b: (G.matrix.bonusMax && !G.matrix.bullseye) ? L.bonus : null, why: L.why }));
-    aiNote = j.note ? `${j.model} — ${j.note}` : j.model;
+    // Name the panel so a "Super Intelligence" verdict is auditable rather than a black box
+    const who = Array.isArray(j.panel) && j.panel.length
+      ? `${j.model} (${j.panel.join(' · ')}${j.chair ? ` → ${j.chair} chaired` : ''}${j.dropped ? ` · ${j.dropped} dropped out` : ''})`
+      : j.model;
+    aiNote = j.note ? `${who} — ${j.note}` : who;
     paintLines({ popup: true });
   } catch (e) {
     closePickModal();

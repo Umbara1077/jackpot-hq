@@ -78,9 +78,45 @@ keeps the Worker ahead of it, but deleting it would remove the trap entirely.
 The Lab's featured **AI Pick** card sends the game rules + recent real draws to the model you
 choose (each shows its maker's mark in the picker) and returns picks with per-line reasoning.
 It runs through `functions/api/ai-pick.js` on Cloudflare so API keys never touch the browser.
-The app auto-detects which models are configured. Honest fine print: no AI improves the odds —
-they build statistically-typical, low-crowd-share lines and explain them. Cost per pick request
-is roughly $0.01–0.05 (Grok/Terra/Opus) up to ~$0.10 (Fable 5).
+The app auto-detects which models are configured.
+
+### ✦ Super Intelligence — the panel
+
+Top of the model picker. Instead of asking one model, it runs two rounds:
+
+1. **Fan-out.** The strongest model from *every* configured provider — Claude Opus 5, GPT-5.6
+   Sol, Grok 4.5, Gemini 3.1 Pro — answers the same question **in parallel**, each producing
+   extra candidate lines plus its own read of the draw history.
+2. **Adjudication.** One model (Anthropic chairs when configured) receives every other model's
+   lines *and* reasoning, resolves where their readings of the history disagree, and builds the
+   final lines. It's told not to average them and warned that a line the whole panel converged
+   on may just be the obvious line other *players* pick too — which makes it worse, not better.
+
+Needs **two or more providers** configured; with one it's greyed out, because a panel of one is
+just that model with extra steps. A provider that errors or stalls drops out of the panel
+instead of failing your request, and the result names who took part, who chaired, and how many
+dropped. If the chair itself fails you still get the best panel answer, labelled as such.
+
+It is slower (two rounds, deepest reasoning setting) and costs the sum of its seats — roughly
+$0.15–0.30 a pick versus $0.01–0.10 for a single model.
+
+### What the models are actually asked to do
+
+Every model, panel or single, now optimises for **two** things instead of one:
+
+- **Profile fit** — match the shape of real winning draws: sum inside the typical band,
+  balanced odd/even and high/low, spread across the range, at most one consecutive pair.
+- **Crowd avoidance** — stay off numbers everyone else plays: all-≤31 birthday picks,
+  arithmetic runs, multiples of 7, dates, playslip patterns, copied recent draws.
+
+**Only the second one is worth money, and the app says so.** Profile fit does not raise your
+odds — every combination is equally likely, always. It means the line resembles a combination
+that actually comes up rather than one no draw has ever looked like. Crowd avoidance is the
+real edge: it doesn't help you win, it means you split the prize with fewer people when you do.
+The prompt forbids calling a number "due" and forbids treating hot/cold streaks as predictive.
+
+Cost per pick is roughly $0.01–0.05 (Grok/Terra/Opus) up to ~$0.10 (Fable 5) for a single
+model; Super Intelligence is the sum of its panel.
 
 ## Password login gate
 
