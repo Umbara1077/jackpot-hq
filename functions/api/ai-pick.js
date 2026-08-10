@@ -139,6 +139,14 @@ export async function onRequestPost(context) {
 
   const count = Math.min(5, Math.max(1, parseInt(body.count, 10) || 1));
   const eKey = effortKey(body.effort);
+
+  // Provider self-test. Answers "why did this model not work?" with the provider's own
+  // words instead of a guess, and tests the standard and deep request shapes separately
+  // so it is obvious whether the deep settings are the problem or the provider is.
+  if (body.diag) {
+    try { return json(await runDiag(env, G, body, eKey)); }
+    catch (e) { return json({ error: `diagnostics failed: ${String(e.message || e).slice(0, 300)}` }, 502); }
+  }
   const run = (emit) => (M.ensemble ? runPanel(env, G, count, body, eKey, emit) : runSingle(env, M, G, count, body, eKey, emit));
 
   // Streaming is opt-in so an older cached client keeps getting the plain JSON it expects.
@@ -182,6 +190,54 @@ function ndjson(run, label) {
   return new Response(readable, {
     headers: { 'content-type': 'application/x-ndjson; charset=utf-8', 'cache-control': 'no-store', ...CORS },
   });
+}
+
+/* Calls every panel seat twice — once with the standard request, once with the deep one —
+   and reports exactly what each provider said. No retries, no salvage, no interpretation:
+   the point is to see the raw failure, including a snippet of whatever came back. */
+async function runDiag(env, G, body, eKey) {
+  const seats = PANEL_SEATS
+    .map(([provider, key]) => ({ ...MODELS[key], apiKey: keyFor(env, provider) }))
+    .filter((m) => m.apiKey);
+  const E = effortOf(panelEffort(eKey));
+  const prompt = buildPrompt(G, 1, body, { panel: true });
+  const deepPrompt = buildPrompt(G, 1, body, { panel: true, effort: panelEffort(eKey) });
+
+  const probe = async (m, label, promptText, opts) => {
+    const t0 = Date.now();
+    try {
+      const raw = await callModel(m, m.apiKey, promptText, { ...opts, timeoutMs: 45000 });
+      const picks = extractJson(raw);
+      const v = validateSome(picks, G, 1);
+      return { mode: label, ok: v.ok, ms: Date.now() - t0, error: v.ok ? '' : `parsed but unusable: ${v.reason}`, sample: String(raw || '').slice(0, 200) };
+    } catch (e) {
+      return { mode: label, ok: false, ms: Date.now() - t0, error: String(e.message || e).slice(0, 400), sample: '' };
+    }
+  };
+
+  const checks = await Promise.all(seats.map(async (m) => {
+    const standard = await probe(m, 'standard', prompt, {});
+    const deep = await probe(m, 'deep', deepPrompt, { effort: E.anthropic, maxTokens: E.maxTokens, chatTokens: E.chatTokens, deepThinking: true });
+    return { name: m.name, provider: m.provider, id: m.id, standard, deep };
+  }));
+
+  return { ok: true, diag: true, game: G.name, effort: E.label, checks };
+}
+
+/* Panel seats salvage what they can: keep the lines that validate, drop the ones that
+   do not. One malformed line out of five should not delete an entire model's
+   contribution — that is all-or-nothing behaviour the single-pick path never had,
+   because it only ever asks for the lines the user wanted. */
+function validateSome(picks, G, want) {
+  if (!picks || !Array.isArray(picks.lines) || !picks.lines.length) return { ok: false, reason: 'no lines array' };
+  const good = [];
+  for (const line of picks.lines) {
+    const probe = { lines: [line], note: '' };
+    if (validate(probe, G, 1).ok) good.push(probe.lines[0]);
+    if (good.length >= want) break;
+  }
+  if (!good.length) return { ok: false, reason: 'no line passed validation' };
+  return { ok: true, lines: good };
 }
 
 async function runSingle(env, M, G, count, body, eKey, emit = () => {}) {
@@ -245,9 +301,12 @@ async function runPanel(env, G, count, body, eKey, emit = () => {}) {
     const started = Date.now();
     const attempt = async (prompt, opts) => {
       const picks = extractJson(await callModel(m, m.apiKey, prompt, opts)); // transport errors propagate
-      const check = validate(picks, G, candidates);
+      // Salvage: keep whatever lines are valid. The panel asks each model for more lines
+      // than the user wanted, so strict all-or-nothing validation gave every extra line
+      // another chance to kill the whole seat.
+      const check = validateSome(picks, G, candidates);
       if (!check.ok) { const err = new Error(check.reason); err.shape = true; throw err; }
-      return { name: m.name, lines: picks.lines.slice(0, candidates), read: picks.note || '' };
+      return { name: m.name, lines: check.lines, read: picks.note || '' };
     };
     let seat;
     try {

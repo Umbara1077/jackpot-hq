@@ -896,6 +896,7 @@ function aiPanelHtml() {
     <div class="aieffort-row">${AI_EFFORTS.map(e =>
       `<button type="button" data-eff="${e.k}" class="effbtn ${e.k === cur ? 'on' : ''}">${esc(e.label)}</button>`).join('')}</div>
     ${aiModel === 'super' ? '<p class="muted small" style="margin:7px 0 0">Super Intelligence always runs at least Deep — its whole point is depth.</p>' : ''}
+    <div class="rowflex" style="margin-top:9px"><button class="obtn" id="aiDiag" style="width:100%">🩺 Test every provider</button></div>
   </div>`;
   return `<div style="margin-top:4px">${aiModelTriggerHtml()}</div>${effort}${status}`;
 }
@@ -903,6 +904,48 @@ function wireEffortButtons(root) {
   $$('#aiEffort .effbtn', root).forEach((b) => {
     b.onclick = () => { S.aiEffort = b.dataset.eff; save(); renderLab(); };
   });
+  const d = $('#aiDiag', root); if (d) d.onclick = runProviderDiagnostics;
+}
+/* Asks every configured provider the same question twice — once with the standard
+   request, once with the deep one — and prints exactly what each said. This exists
+   because guessing at why a provider drops out of the panel did not work. */
+async function runProviderDiagnostics() {
+  const ep = aiEndpoint();
+  if (!ep) return toast('Connect a site URL first');
+  openGenLoading('Testing every provider…', 'Each maker gets the same question twice: standard settings, then deep.', 'super', true);
+  const ctrl = new AbortController(); const timer = setTimeout(() => ctrl.abort(), 240000);
+  try {
+    const r = await fetch(ep, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', ...(S.aiPass ? { 'x-app-pass': S.aiPass } : {}) },
+      body: JSON.stringify({ diag: true, model: 'super', game: labGame, effort: aiEffortKey(), recent: (RES[labGame] || []).slice(-6).map(String) }),
+      signal: ctrl.signal,
+    });
+    if (r.status === 401) { closePickModal(); askPasscode(); return; }
+    const j = await r.json().catch(() => null);
+    closePickModal();
+    if (!j || !j.ok) return toast((j && j.error) || 'Diagnostics failed (' + r.status + ')');
+    openSheet(diagHtml(j));
+  } catch (e) {
+    closePickModal();
+    toast(e.name === 'AbortError' ? 'Diagnostics timed out' : 'Diagnostics could not run');
+  } finally { clearTimeout(timer); }
+}
+function diagHtml(j) {
+  const mode = (m) => m.ok
+    ? `<span class="diag-ok">✓ worked</span><span class="muted small"> · ${(m.ms / 1000).toFixed(1)}s</span>`
+    : `<span class="diag-bad">✕ failed</span><span class="muted small"> · ${(m.ms / 1000).toFixed(1)}s</span>
+       <div class="diag-err">${esc(m.error || 'no error text')}</div>${m.sample ? `<div class="diag-sample">returned: ${esc(m.sample)}</div>` : ''}`;
+  const rows = j.checks.map((c) => `<div class="card" style="margin-top:10px">
+    <b>${esc(c.name)}</b> <span class="muted small">${esc(c.provider)} · ${esc(c.id || '')}</span>
+    <div class="diag-row"><b>Standard</b> ${mode(c.standard)}</div>
+    <div class="diag-row"><b>Deep</b> ${mode(c.deep)}</div>
+  </div>`).join('');
+  const bad = j.checks.filter((c) => !c.standard.ok || !c.deep.ok);
+  return `<h3>🩺 Provider test</h3>
+    <p class="muted small">${esc(j.game)} · deep runs at ${esc(j.effort)} effort. Standard is the exact request a single pick sends.</p>
+    ${bad.length ? `<p class="chip" style="margin-top:9px;color:var(--bad);border-color:var(--bad)">${bad.length} provider${bad.length === 1 ? '' : 's'} failing — the message under each one is the provider's own.</p>` : '<p class="chip" style="margin-top:9px;color:var(--ok);border-color:var(--ok)">All providers answered in both modes.</p>'}
+    ${rows}`;
 }
 /* The reasoning the user asked to see: each model's read of the history and the lines
    it proposed, plus who chaired. Collapsed by default so it never buries the numbers. */
