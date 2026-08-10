@@ -1808,9 +1808,10 @@ function openAiModelPicker() {
   const groups = AI_PROVIDERS.map((p) => {
     const buttons = p.models.map((k) => {
       const m = modelsMap[k] || { name: aiModelName(k), available: false };
+      // raw text only — escaped once at render below, never pre-escaped here
       const sub = live && !m.available
         ? (k === 'super' ? 'Needs two AI providers configured' : 'Unavailable on this site')
-        : (AI_BLURB[k] || esc(p.brand) + ' · ' + esc(p.name));
+        : (AI_BLURB[k] || `${p.brand} · ${p.name}`);
       return `<button type="button" data-ai="${k}" class="aimodel ${k === aiModel ? 'on' : ''}" ${live && !m.available ? 'disabled' : ''}>
         ${aiLogo(k)}
         <span class="aimeta"><b class="grad">${esc(m.name)}</b><small>${esc(sub)}</small></span>

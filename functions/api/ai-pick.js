@@ -305,7 +305,13 @@ function callModel(M, apiKey, prompt, opts = {}) {
   return callOpenAICompatible(M.provider, apiKey, M.id, prompt, o);
 }
 
-const withTimeout = (ms) => AbortSignal.timeout(ms);
+// Guarded on purpose: this sits in the call path of EVERY model, not just the panel.
+// If a runtime ever lacks AbortSignal.timeout, an unguarded call would throw before
+// the fetch and take down the single-model picks that work today. `signal: undefined`
+// is a valid fetch init, so the worst case is losing the timeout, not the request.
+const withTimeout = (ms) => {
+  try { return AbortSignal.timeout(ms); } catch { return undefined; }
+};
 
 async function callAnthropic(apiKey, model, prompt, opts = {}) {
   const schema = {
@@ -404,8 +410,11 @@ async function callGemini(apiKey, model, prompt, opts = {}) {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({
+      // No maxOutputTokens on purpose. Gemini counts thinking against it, and these
+      // prompts reason a lot — capping it risks truncating mid-JSON on models that
+      // work fine today. Leave Google's default; the timeout is the real bound.
       contents: [{ parts: [{ text: prompt }] }],
-      generationConfig: { responseMimeType: 'application/json', maxOutputTokens: 12000 }
+      generationConfig: { responseMimeType: 'application/json' }
     }),
     signal: withTimeout(opts.timeoutMs || 90000),
   });
