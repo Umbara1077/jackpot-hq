@@ -111,7 +111,8 @@ export async function onRequestPost(context) {
   const prompt = buildPrompt(G, count, body);
 
   try {
-    const callApi = (pPrompt) => callModel(M, apiKey, pPrompt, { effort: 'high' });
+    // No opts on purpose — a single pick must send exactly the request that works today.
+    const callApi = (pPrompt) => callModel(M, apiKey, pPrompt);
     const raw = await callApi(prompt);
 
     const picks = extractJson(raw);
@@ -146,7 +147,7 @@ async function runPanel(env, G, count, body) {
   const analystPrompt = buildPrompt(G, candidates, body, { panel: true });
 
   const settled = await Promise.allSettled(panel.map(async (m) => {
-    const raw = await callModel(m, m.apiKey, analystPrompt, { effort: 'high', timeoutMs: 75000 });
+    const raw = await callModel(m, m.apiKey, analystPrompt, DEEP(100000));
     const picks = extractJson(raw);
     const check = validate(picks, G, candidates);
     if (!check.ok) throw new Error(check.reason);
@@ -164,7 +165,8 @@ async function runPanel(env, G, count, body) {
 
   if (seats.length >= 2) {
     try {
-      const raw = await callModel(chairModel, chairModel.apiKey, buildChairPrompt(G, count, body, seats), { effort: 'high', timeoutMs: 90000 });
+      // Seats (100s) then chair (110s) stays inside the client's 240s leash for the panel.
+      const raw = await callModel(chairModel, chairModel.apiKey, buildChairPrompt(G, count, body, seats), DEEP(110000));
       const picks = extractJson(raw);
       const check = validate(picks, G, count);
       if (check.ok) {
@@ -297,19 +299,28 @@ ${OUTPUT_SHAPE(G)}`;
 /* ---------------- providers (raw HTTP keeps this function dependency-free for zero-build Pages deploys) ---------------- */
 
 // One entry point so the panel can call four different providers without caring which.
-// timeoutMs bounds each call: on the panel, one wedged provider must not hold up the rest.
+//
+// ⚠ Every option here is OFF by default, and that is load-bearing. A single-model pick
+// calls this with no opts and must produce byte-identical requests to the ones that
+// worked before the panel existed. Turning deep reasoning and per-call deadlines on
+// for everyone is exactly what broke the standard models: the requests got much slower
+// (higher effort + adaptive thinking + a longer prompt) at the same moment they gained
+// a 90s server deadline they never used to have, so they aborted and surfaced as 502s.
+// Opt in per call site; never change the defaults.
 function callModel(M, apiKey, prompt, opts = {}) {
-  const o = { effort: 'high', timeoutMs: 90000, ...opts };
-  if (M.provider === 'anthropic') return callAnthropic(apiKey, M.id, prompt, o);
-  if (M.provider === 'google') return callGemini(apiKey, M.id, prompt, o);
-  return callOpenAICompatible(M.provider, apiKey, M.id, prompt, o);
+  if (M.provider === 'anthropic') return callAnthropic(apiKey, M.id, prompt, opts);
+  if (M.provider === 'google') return callGemini(apiKey, M.id, prompt, opts);
+  return callOpenAICompatible(M.provider, apiKey, M.id, prompt, opts);
 }
 
-// Guarded on purpose: this sits in the call path of EVERY model, not just the panel.
-// If a runtime ever lacks AbortSignal.timeout, an unguarded call would throw before
-// the fetch and take down the single-model picks that work today. `signal: undefined`
-// is a valid fetch init, so the worst case is losing the timeout, not the request.
+// Deep-reasoning profile — the panel only. Its seats run concurrently, so a wedged
+// provider has to be cut loose or it holds up the other three.
+const DEEP = (timeoutMs) => ({ effort: 'high', maxTokens: 16000, deepThinking: true, timeoutMs });
+
+// Returns undefined when the runtime has no AbortSignal.timeout; `signal: undefined`
+// is a valid fetch init, so the worst case is losing the deadline, not the request.
 const withTimeout = (ms) => {
+  if (!ms) return undefined; // no deadline requested — matches the original behaviour
   try { return AbortSignal.timeout(ms); } catch { return undefined; }
 };
 
@@ -345,15 +356,17 @@ async function callAnthropic(apiKey, model, prompt, opts = {}) {
     },
     body: JSON.stringify({
       model,
-      // max_tokens caps thinking AND response text together. The reasoning here is
-      // deliberately deep, so leave real headroom — 6000 truncated mid-answer.
-      max_tokens: 16000,
+      // Defaults below are the known-good single-model values. max_tokens caps thinking
+      // AND response text together, so the panel raises it alongside its higher effort.
+      max_tokens: opts.maxTokens || 6000,
       fallbacks: 'default', // if a safety classifier ever declines, Anthropic retries on its recommended fallback model
-      thinking: { type: 'adaptive' }, // let the model decide its own depth per game
-      output_config: { effort: opts.effort || 'high', format: { type: 'json_schema', schema } },
+      // Thinking is already on by default for these models; only the panel asks for it
+      // explicitly, so a single pick sends the exact body it always sent.
+      ...(opts.deepThinking ? { thinking: { type: 'adaptive' } } : {}),
+      output_config: { effort: opts.effort || 'medium', format: { type: 'json_schema', schema } },
       messages: [{ role: 'user', content: prompt }],
     }),
-    signal: withTimeout(opts.timeoutMs || 90000),
+    signal: withTimeout(opts.timeoutMs),
   });
   const data = await r.json();
   if (!r.ok) throw new Error(data?.error?.message || `HTTP ${r.status}`);
@@ -365,16 +378,17 @@ async function callAnthropic(apiKey, model, prompt, opts = {}) {
 
 async function callOpenAICompatible(provider, apiKey, model, prompt, opts = {}) {
   const base = provider === 'openai' ? 'https://api.openai.com/v1' : 'https://api.x.ai/v1';
-  const signal = withTimeout(opts.timeoutMs || 90000);
+  const signal = withTimeout(opts.timeoutMs);
   const body = {
     model,
     messages: [{ role: 'user', content: prompt }],
     response_format: { type: 'json_object' },
   };
   // OpenAI reasoning models take max_completion_tokens; xAI takes max_tokens.
-  // Raised alongside Anthropic's — reasoning tokens are billed against this too.
-  if (provider === 'openai') body.max_completion_tokens = 12000;
-  else body.max_tokens = 12000;
+  // 4000 is the known-good single-model value; the panel raises it for deeper reasoning.
+  const cap = opts.maxTokens || 4000;
+  if (provider === 'openai') body.max_completion_tokens = cap;
+  else body.max_tokens = cap;
 
   let r = await fetch(`${base}/chat/completions`, {
     method: 'POST',
@@ -416,7 +430,7 @@ async function callGemini(apiKey, model, prompt, opts = {}) {
       contents: [{ parts: [{ text: prompt }] }],
       generationConfig: { responseMimeType: 'application/json' }
     }),
-    signal: withTimeout(opts.timeoutMs || 90000),
+    signal: withTimeout(opts.timeoutMs),
   });
   const data = await r.json();
   if (!r.ok) throw new Error(data?.error?.message || `HTTP ${r.status}`);
