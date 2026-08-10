@@ -1965,9 +1965,10 @@ async function aiGenerate() {
   const J = (G.jackpotSeed || G.fixedJackpot) ? jackpotOf(labGame) : null;
   // The panel runs two rounds across several providers, so it needs a longer leash
   // than a single model — the server bounds each individual call on its own side.
-  // Budget comes from the chosen effort; the panel runs two rounds so it gets more.
+  // Budget comes from the chosen effort. The panel needs far more: each seat gets two
+  // attempts (90s + 60s) and the chair the same, so the worst realistic case is ~240s.
   const ctrl = new AbortController();
-  const timer = setTimeout(() => ctrl.abort(), panel ? Math.max(240000, E.ms) : E.ms);
+  const timer = setTimeout(() => ctrl.abort(), panel ? Math.max(330000, E.ms + 60000) : E.ms);
   try {
     const r = await fetch(ep, {
       method: 'POST',

@@ -231,19 +231,39 @@ async function runPanel(env, G, count, body, eKey, emit = () => {}) {
 
   // Progress is emitted from inside each task so a fast provider reports the moment it
   // lands, instead of everyone appearing to finish together when allSettled resolves.
+  /* Two attempts per seat, and the second one deliberately drops back to the exact
+     configuration a single pick uses.
+
+     This is why providers that answer fine on their own were vanishing from the panel:
+     (1) the single-pick path has always had a corrective retry when a model returns
+     malformed JSON, and the panel had none — one badly-formatted first answer and the
+     seat was gone; (2) the panel also pushed a bigger token ceiling and a "reason
+     thoroughly" prompt at providers only ever proven at the smaller, plainer settings.
+     So attempt 1 is the deep profile, attempt 2 is the known-good one. */
+  const safePrompt = buildPrompt(G, candidates, body, { panel: true }); // no deep guide
   const settled = await Promise.allSettled(panel.map(async (m) => {
     const started = Date.now();
-    try {
-      const picks = extractJson(await callModel(m, m.apiKey, analystPrompt, { ...deep, timeoutMs: 100000 }));
+    const attempt = async (prompt, opts) => {
+      const picks = extractJson(await callModel(m, m.apiKey, prompt, opts)); // transport errors propagate
       const check = validate(picks, G, candidates);
-      if (!check.ok) throw new Error(check.reason);
-      const seat = { name: m.name, lines: picks.lines.slice(0, candidates), read: picks.note || '' };
-      emit({ t: 'seat', slot: 'seat', state: 'done', name: m.name, ms: Date.now() - started, lines: seat.lines.length, read: seat.read });
-      return seat;
-    } catch (e) {
-      emit({ t: 'seat', slot: 'seat', state: 'fail', name: m.name, ms: Date.now() - started, reason: String(e.message || e).slice(0, 120) });
-      throw e;
+      if (!check.ok) { const err = new Error(check.reason); err.shape = true; throw err; }
+      return { name: m.name, lines: picks.lines.slice(0, candidates), read: picks.note || '' };
+    };
+    let seat;
+    try {
+      seat = await attempt(analystPrompt, { ...deep, timeoutMs: 90000 });
+    } catch (e1) {
+      emit({ t: 'seat', slot: 'seat', state: 'retry', name: m.name, reason: `${String(e1.message || e1).slice(0, 90)} — retrying at standard settings` });
+      try {
+        // No opts = the single-pick request shape, which these providers demonstrably serve.
+        seat = await attempt(safePrompt, { timeoutMs: 60000 });
+      } catch (e2) {
+        emit({ t: 'seat', slot: 'seat', state: 'fail', name: m.name, ms: Date.now() - started, reason: String(e2.message || e2).slice(0, 120) });
+        throw e2;
+      }
     }
+    emit({ t: 'seat', slot: 'seat', state: 'done', name: m.name, ms: Date.now() - started, lines: seat.lines.length, read: seat.read });
+    return seat;
   }));
 
   const seats = settled.filter((s) => s.status === 'fulfilled').map((s) => s.value);
@@ -261,15 +281,25 @@ async function runPanel(env, G, count, body, eKey, emit = () => {}) {
     const started = Date.now();
     emit({ t: 'phase', phase: 'chair', name: chairModel.name });
     emit({ t: 'seat', slot: 'chair', state: 'start', name: chairModel.name, role: `Adjudicating ${seats.length} panel answers` });
-    try {
-      const raw = await callModel(chairModel, chairModel.apiKey, buildChairPrompt(G, count, body, seats), { ...deep, timeoutMs: 110000 });
-      const picks = extractJson(raw);
+    const chairPrompt = buildChairPrompt(G, count, body, seats);
+    const chairTry = async (opts) => {
+      const picks = extractJson(await callModel(chairModel, chairModel.apiKey, chairPrompt, opts));
       const check = validate(picks, G, count);
-      if (check.ok) {
-        emit({ t: 'seat', slot: 'chair', state: 'done', name: chairModel.name, ms: Date.now() - started, lines: picks.lines.length, role: 'Verdict' });
-        return { ...base, lines: picks.lines.slice(0, count), note: picks.note || '', chair: chairModel.name };
+      if (!check.ok) { const err = new Error(check.reason); err.shape = true; throw err; }
+      return picks;
+    };
+    try {
+      let picks;
+      try {
+        picks = await chairTry({ ...deep, timeoutMs: 90000 });
+      } catch (e1) {
+        // Same fallback as the seats — don't lose the verdict to one malformed answer.
+        emit({ t: 'seat', slot: 'chair', state: 'retry', name: chairModel.name, reason: `${String(e1.message || e1).slice(0, 90)} — retrying at standard settings` });
+        picks = await chairTry({ timeoutMs: 60000 });
       }
-      emit({ t: 'seat', slot: 'chair', state: 'fail', name: chairModel.name, ms: Date.now() - started, reason: check.reason });
+      // chairTry only returns on a validated answer, so reaching here means a verdict.
+      emit({ t: 'seat', slot: 'chair', state: 'done', name: chairModel.name, ms: Date.now() - started, lines: picks.lines.length, role: 'Verdict' });
+      return { ...base, lines: picks.lines.slice(0, count), note: picks.note || '', chair: chairModel.name };
     } catch (e) {
       emit({ t: 'seat', slot: 'chair', state: 'fail', name: chairModel.name, ms: Date.now() - started, reason: String(e.message || e).slice(0, 120) });
     }
