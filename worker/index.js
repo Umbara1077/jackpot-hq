@@ -9,6 +9,8 @@
 import * as aiPick from '../functions/api/ai-pick.js';
 import * as sync from '../functions/api/sync.js';
 import * as auth from '../functions/api/auth/[action].js';
+import * as odds from '../functions/api/odds.js';
+import * as sportsAi from '../functions/api/sports-ai.js';
 
 const json = (obj, status = 200) =>
   new Response(JSON.stringify(obj), { status, headers: { 'content-type': 'application/json' } });
@@ -30,6 +32,19 @@ export default {
       if (request.method === 'OPTIONS') return aiPick.onRequestOptions(context());
       if (request.method === 'GET') return aiPick.onRequestGet(context());
       if (request.method === 'POST') return aiPick.onRequestPost(context());
+      return json({ error: 'method not allowed' }, 405);
+    }
+
+    if (path === '/api/odds') {
+      if (request.method === 'OPTIONS') return odds.onRequestOptions(context());
+      if (request.method === 'GET') return odds.onRequestGet(context());
+      return json({ error: 'method not allowed' }, 405);
+    }
+
+    if (path === '/api/sports-ai') {
+      if (request.method === 'OPTIONS') return sportsAi.onRequestOptions(context());
+      if (request.method === 'GET') return sportsAi.onRequestGet(context());
+      if (request.method === 'POST') return sportsAi.onRequestPost(context());
       return json({ error: 'method not allowed' }, 405);
     }
 
