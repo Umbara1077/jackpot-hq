@@ -2002,15 +2002,31 @@ async function aiGenerate() {
       ? 'Every maker answers in parallel, then one adjudicates all of them.'
       : `${E.label} effort · matching the typical draw profile and dodging crowded numbers.`,
     aiModel, true);
-  const recent = (RES[labGame] || []).slice(-15).map(r => G.digits
+  const recent = (RES[labGame] || []).slice(-25).map(r => G.digits
     ? `${r.d}${r.t ? '/' + r.t : ''}: ${r.n}${r.f ? ' FB' + r.f : ''}`
     : `${r.d}: ${r.n.join(' ')}${r.b != null ? ' +' + r.b : ''}`);
-  let hot = [], cold = [];
+  let hot = [], cold = [], stats = null;
   if (!G.digits && G.matrix && G.matrix.pick > 1) {
     const { f, last, draws } = freqTable(labGame, 60);
     const items = Array.from({ length: G.matrix.max }, (_, i) => ({ n: i + 1, c: f[i + 1], gap: last[i + 1] < 0 ? draws : draws - 1 - last[i + 1] }));
     hot = [...items].sort((a, b) => b.c - a.c).slice(0, 5).map(x => x.n);
     cold = [...items].sort((a, b) => b.gap - a.gap).slice(0, 5).map(x => x.n);
+    // Empirical shape of real draws — the "based on data" ground truth we hand the AI.
+    const pick = G.matrix.pick, mid = (G.matrix.max + 1) / 2;
+    const rows = (RES[labGame] || []).slice(-120).filter(r => Array.isArray(r.n) && r.n.length === pick);
+    if (rows.length >= 12) {
+      const sums = rows.map(r => r.n.reduce((a, b) => a + b, 0));
+      const mean = sums.reduce((a, b) => a + b, 0) / sums.length;
+      const sd = Math.sqrt(sums.reduce((a, b) => a + (b - mean) ** 2, 0) / sums.length);
+      const oddAvg = rows.reduce((a, r) => a + r.n.filter(n => n % 2).length, 0) / rows.length;
+      const highAvg = rows.reduce((a, r) => a + r.n.filter(n => n > mid).length, 0) / rows.length;
+      stats = {
+        draws: rows.length,
+        sumLo: Math.round(mean - sd), sumHi: Math.round(mean + sd), sumMean: Math.round(mean),
+        oddAvg: +oddAvg.toFixed(1), evenAvg: +(pick - oddAvg).toFixed(1),
+        highAvg: +highAvg.toFixed(1), lowAvg: +(pick - highAvg).toFixed(1),
+      };
+    }
   }
   const J = (G.jackpotSeed || G.fixedJackpot) ? jackpotOf(labGame) : null;
   // The panel runs two rounds across several providers, so it needs a longer leash
@@ -2026,7 +2042,7 @@ async function aiGenerate() {
       body: JSON.stringify({
         model: aiModel, game: labGame, count: Math.min(5, labCount),
         effort: aiEffortKey(), stream: true,
-        recent, hot, cold, jackpot: J ? fmtMoney(J.amt) : null,
+        recent, hot, cold, stats, jackpot: J ? fmtMoney(J.amt) : null,
       }),
       signal: ctrl.signal,
     });

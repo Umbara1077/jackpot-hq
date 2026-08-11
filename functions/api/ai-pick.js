@@ -380,21 +380,64 @@ async function runPanel(env, G, count, body, eKey, emit = () => {}) {
    look, crowd avoidance shapes one few other players would have picked. Asking
    for both at once, with the reasoning steps spelled out, produces noticeably
    better-argued lines than the old "build a low-crowd line" one-liner. */
+// Theoretical shape of the game, straight from the matrix — no history needed.
+// A uniform draw's sum is ~Normal(mean, sd); most real draws land within one sd of
+// the mean, and a balanced draw splits roughly half odd / half high. Giving the model
+// these exact numbers beats asking it to infer them from a handful of raw draw lines.
+function matrixTargets(G) {
+  if (G.digits || !G.pick || G.pick < 2 || !G.max) return null;
+  const mean = G.pick * (G.max + 1) / 2;
+  const sd = Math.sqrt(G.pick * (G.max + 1) * (G.max - G.pick) / 12);
+  const lo = Math.floor(G.pick / 2), hi = Math.ceil(G.pick / 2);
+  const split = lo === hi ? `${lo}` : `${lo}–${hi}`;
+  return {
+    sumLo: Math.round(mean - sd), sumHi: Math.round(mean + sd), sumMean: Math.round(mean),
+    mid: Math.round((G.max + 1) / 2), split,
+    decades: Math.min(G.pick, Math.ceil(G.max / 10)),
+  };
+}
+
+// Empirical shape of the real recent draws, computed client-side and passed in as
+// body.stats. This is the "based on data" ground truth — what draws actually look like,
+// not just what the math says they should.
+function statsLine(G, s) {
+  if (!s || G.digits) return '';
+  const bits = [];
+  if (Number.isFinite(s.sumLo) && Number.isFinite(s.sumHi)) bits.push(`sums usually ${s.sumLo}–${s.sumHi} (avg ${s.sumMean})`);
+  if (Number.isFinite(s.oddAvg)) bits.push(`about ${s.oddAvg} odd / ${s.evenAvg} even`);
+  if (Number.isFinite(s.highAvg)) bits.push(`about ${s.highAvg} above the midpoint / ${s.lowAvg} below`);
+  if (!bits.length) return '';
+  return `What real draws actually look like (measured over the last ${s.draws || 'many'} draws): ${bits.join('; ')}.`;
+}
+
 function gameContext(G, body) {
   const matrix = G.digits
     ? `${G.digits} digits, each 0-9 (order matters for a straight bet)`
     : `${G.pick} distinct numbers from 1 to ${G.max}` + (G.bonusMax ? `, plus one ${G.bonus} from 1 to ${G.bonusMax}` : '');
   const recent = Array.isArray(body.recent) && body.recent.length
-    ? `Recent real draws (oldest to newest):\n${body.recent.slice(-15).map(String).join('\n')}`
+    ? `Recent real draws (oldest to newest):\n${body.recent.slice(-20).map(String).join('\n')}`
     : 'No recent draw data provided.';
   const hot = Array.isArray(body.hot) && body.hot.length ? `Most frequently drawn recently: ${body.hot.join(', ')}` : '';
   const cold = Array.isArray(body.cold) && body.cold.length ? `Longest without appearing: ${body.cold.join(', ')}` : '';
   const jackpot = body.jackpot ? `Current jackpot: ${body.jackpot}.` : '';
+
+  const t = matrixTargets(G);
+  const empirical = statsLine(G, body.stats);
+  const profile = t
+    ? `Statistical targets for this game (use these concrete numbers — do not re-derive them from a few draws):
+- Sum: aim inside ${t.sumLo}–${t.sumHi} (the central band; the mean is ${t.sumMean}). Lines far outside this band almost never come up.
+- Odd/even: aim near ${t.split} odd (the rest even). All-odd and all-even draws are rare.
+- High/low: aim near ${t.split} numbers above ${t.mid} (the rest below). Both halves should be represented.
+- Spread: cover about ${t.decades} different tens-groups; don't bunch several numbers in one decade.
+${empirical ? empirical + '\n' : ''}These describe the *shape* of a typical draw. They do not raise your odds — every combination is equally likely — but a line that fits them looks like a real winning draw instead of one no draw has ever resembled.`
+    : empirical;
+
   return `Game: ${G.name} — pick ${matrix}.${G.note ? ' ' + G.note : ''}
 ${jackpot}
 ${recent}
 ${hot}
-${cold}`;
+${cold}
+${profile}`;
 }
 
 const GROUND_RULES = `Ground rules you must respect and never contradict:
@@ -405,13 +448,13 @@ const GROUND_RULES = `Ground rules you must respect and never contradict:
 const OBJECTIVES = (G) => `You are optimising for two things at once. Every line must satisfy both.
 
 OBJECTIVE A — PROFILE FIT (make the line look like a real winning draw)
-Winning combinations are drawn uniformly, but they are not spread uniformly across the *shapes* a combination can take: most real draws land in a narrow band on sum, balance and spread, because far more combinations sit there. A line built at the extremes of those bands is a combination almost no draw has ever resembled. Use the history above to work out, and then hit:
-- Sum: land inside the central band of the recent winning sums, not at the extremes.
-- Odd/even: near-balanced. All-odd and all-even lines are rare in practice.
-${G.digits ? '' : `- High/low: near-balanced around the midpoint of the 1-${G.max} range.
-- Spread: cover the range. Do not cluster several numbers in one decade.
+Winning combinations are drawn uniformly, but they are not spread uniformly across the *shapes* a combination can take: most real draws land in a narrow band on sum, balance and spread, because far more combinations sit there. A line built at the extremes of those bands is a combination almost no draw has ever resembled. Hit the "Statistical targets" and the measured shape given above — those are the numbers to match:
+- Sum: land inside the stated central band, not at the extremes. Compute each line's sum and check it.
+- Odd/even: match the stated split. All-odd and all-even lines are rare in practice.
+${G.digits ? '' : `- High/low: match the stated above/below-midpoint split.
+- Spread: cover the stated number of tens-groups. Do not cluster several numbers in one decade.
 - Adjacency: at most one consecutive pair. Real draws rarely contain runs.
-`}This does not improve your odds — it means the line resembles the kind of combination that actually comes up, instead of one that has never looked like a winner.
+`}Where the measured shape of real recent draws differs from the theoretical targets, prefer what the real draws show. This does not improve your odds — it means the line resembles the kind of combination that actually comes up, instead of one that has never looked like a winner.
 
 OBJECTIVE B — CROWD AVOIDANCE (own more of the prize if it does hit)
 This one has real, bankable value: prizes are shared between everyone holding the line, so an unpopular line is worth more money when it wins. Actively avoid:
@@ -440,10 +483,10 @@ ${gameContext(G, body)}
 ${OBJECTIVES(G)}
 
 Work through it in this order before you answer:
-1. Read the history: typical sum range, typical odd/even and high/low splits, how spread out a normal draw is.
+1. Take the statistical targets above as your shape spec (sum band, odd/even, high/low, spread). Cross-check them against the measured real-draw shape and the recent draws; where they differ, trust the measured data.
 2. Note which zones of the board are over-played by other people (see Objective B).
-3. Build ${count} candidate line${count > 1 ? 's' : ''} that sit in the typical zones on shape while staying out of the crowded zones on popularity.
-4. Check each line against both objectives and fix any that fail. Make the lines different from each other — do not submit ${count} variations of one idea.
+3. Build ${count} candidate line${count > 1 ? 's' : ''} that sit inside the target shape while staying out of the crowded zones on popularity.
+4. For each line, actually compute its sum and its odd/even and high/low counts, confirm they fall in the target bands, and fix any that miss. Make the lines different from each other — do not submit ${count} variations of one idea.
 
 For each line write a "why" (max 160 chars) naming the concrete reason it passes: its sum, its split, and the crowd pattern it dodges. Be specific and readable, not generic. Never promise better odds.
 ${forPanel
