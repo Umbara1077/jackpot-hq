@@ -508,6 +508,19 @@ const withTimeout = (ms) => {
   try { return AbortSignal.timeout(ms); } catch { return undefined; }
 };
 
+// Read a provider response as JSON without letting a non-JSON body masquerade as a
+// parse error. Calling r.json() before checking r.ok means a gateway HTML page, a
+// rate-limit page, or an empty body surfaces as a cryptic "Unexpected token" and
+// hides the real HTTP status — read the text first, then surface status + a snippet.
+async function readJson(r, label) {
+  const text = await r.text();
+  let data = null;
+  try { data = text ? JSON.parse(text) : null; } catch { /* non-JSON body handled below */ }
+  if (!r.ok) throw new Error(`HTTP ${r.status}: ${(data?.error?.message || text || '').slice(0, 200) || '(empty body)'}`);
+  if (data == null) throw new Error(`${label} returned a non-JSON response (HTTP ${r.status}): ${text.slice(0, 200) || '(empty body)'}`);
+  return data;
+}
+
 async function callAnthropic(apiKey, model, prompt, opts = {}) {
   const schema = {
     type: 'object',
@@ -552,8 +565,7 @@ async function callAnthropic(apiKey, model, prompt, opts = {}) {
     }),
     signal: withTimeout(opts.timeoutMs),
   });
-  const data = await r.json();
-  if (!r.ok) throw new Error(data?.error?.message || `HTTP ${r.status}`);
+  const data = await readJson(r, 'Anthropic');
   if (data.stop_reason === 'refusal') throw new Error('the model declined this request');
   const text = (data.content || []).find((b) => b.type === 'text');
   if (!text) throw new Error('empty response');
@@ -596,7 +608,7 @@ async function callOpenAICompatible(provider, apiKey, model, prompt, opts = {}) 
       throw new Error(`HTTP ${r.status}: ${errText.slice(0, 200)}`);
     }
   }
-  const data = await r.json();
+  const data = await readJson(r, provider);
   const msg = data.choices?.[0]?.message?.content;
   if (!msg) throw new Error('empty response');
   return msg;
@@ -616,8 +628,7 @@ async function callGemini(apiKey, model, prompt, opts = {}) {
     }),
     signal: withTimeout(opts.timeoutMs),
   });
-  const data = await r.json();
-  if (!r.ok) throw new Error(data?.error?.message || `HTTP ${r.status}`);
+  const data = await readJson(r, 'Gemini');
   const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
   if (!text) throw new Error('empty response from Gemini');
   return text;
