@@ -62,12 +62,19 @@ const EFFORTS = {
   },
   // ⚠ balanced === the shipped, working request. Do not tune these three fields.
   balanced: { label: 'Balanced', anthropic: 'medium', maxTokens: 6000, chatTokens: 4000, ms: 120000, guide: '' },
+  /* maxTokens below has to be far larger than the answer, because on Anthropic it caps
+     thinking AND response text together — and raising `effort` is precisely an
+     instruction to spend more of it thinking. At `high`/`max` the JSON is a rounding
+     error next to the reasoning, so a ceiling sized for the answer gets consumed before
+     the model starts writing and the reply arrives truncated mid-JSON. Anthropic's own
+     floor for `max` is 64000. chatTokens is untouched: the other providers never receive
+     an effort parameter, which is why they were never affected. */
   deep: {
-    label: 'Deep', anthropic: 'high', maxTokens: 16000, chatTokens: 12000, ms: 210000,
+    label: 'Deep', anthropic: 'high', maxTokens: 32000, chatTokens: 12000, ms: 210000,
     guide: 'Reason thoroughly before answering. Work the history properly, weigh several candidate lines against both objectives, and discard the ones that fail.',
   },
   max: {
-    label: 'Maximum', anthropic: 'max', maxTokens: 24000, chatTokens: 16000, ms: 300000,
+    label: 'Maximum', anthropic: 'max', maxTokens: 64000, chatTokens: 16000, ms: 300000,
     guide: 'Take as long as you need. Explore the number space widely, build more candidates than you need, stress-test each against both objectives, and only then choose. Depth matters more than speed here.',
   },
 };
@@ -611,6 +618,15 @@ async function callAnthropic(apiKey, model, prompt, opts = {}) {
   const data = await readJson(r, 'Anthropic');
   if (data.stop_reason === 'refusal') throw new Error('the model declined this request');
   const text = (data.content || []).find((b) => b.type === 'text');
+  // Hitting the ceiling is the one failure that does not look like a failure: HTTP 200,
+  // a text block, and JSON that simply stops halfway. Without this check it reaches the
+  // parser, comes back null, and surfaces as "no lines array" — which blames the model
+  // for malformed output instead of naming the budget as the cause. Say what happened.
+  if (data.stop_reason === 'max_tokens' && !extractJson(text?.text || '')) {
+    const cap = opts.maxTokens || 6000;
+    const used = data.usage?.output_tokens;
+    throw new Error(`ran out of room before finishing the JSON — hit the ${cap}-token ceiling${used ? ` (used ${used})` : ''}. Thinking counts against it, so raise the ceiling or drop to a lower effort.`);
+  }
   if (!text) throw new Error('empty response');
   return text.text;
 }
