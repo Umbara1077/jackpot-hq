@@ -47,28 +47,31 @@ const PANEL_SEATS = [
 const PROVIDERS = ['anthropic', 'openai', 'xai', 'google'];
 
 /* Effort profiles.
-   `balanced` is deliberately byte-identical to the request that works in production —
-   it is the default, and changing it is what took the standard models down before.
    Only Anthropic gets a real `effort` API parameter (it already had one). For the other
    providers effort is expressed through the token ceiling and a prompt line, because
    inventing new API fields per provider is exactly the move that broke things.
-   Token ceilings are per provider because the known-good values differ: Anthropic ran
-   6000 (thinking counts against it) and the chat-completions providers ran 4000. At
-   `balanced` both must reproduce those exactly. */
+   Token ceilings are per provider because the meaning differs: `maxTokens` is Anthropic's
+   combined thinking + answer budget, `chatTokens` is the answer-only cap the
+   chat-completions providers use. 4000 is the known-good chat value and is untouched.
+
+   ⚠ maxTokens is NOT an answer-size setting. On claude-opus-5 thinking is on by default
+   and on claude-fable-5 it cannot be turned off at all, and `max_tokens` caps thinking
+   AND response text together. The old 6000 here was inherited from the pre-thinking Opus
+   models: on the current ones a medium-effort run through this prompt regularly spends
+   the whole 6000 reasoning and then truncates mid-JSON, which surfaces as a failure at
+   the very end of an otherwise healthy request. A ceiling that is never reached costs
+   nothing — `effort` is what decides how much is actually spent — so these are sized
+   with real headroom rather than to the size of the answer. */
 const EFFORTS = {
   quick: {
-    label: 'Quick', anthropic: 'low', maxTokens: 6000, chatTokens: 4000, ms: 60000,
+    label: 'Quick', anthropic: 'low', maxTokens: 16000, chatTokens: 4000, ms: 60000,
     guide: 'Keep your reasoning brief. Go with a sound answer rather than an exhaustive one.',
   },
-  // ⚠ balanced === the shipped, working request. Do not tune these three fields.
-  balanced: { label: 'Balanced', anthropic: 'medium', maxTokens: 6000, chatTokens: 4000, ms: 120000, guide: '' },
-  /* maxTokens below has to be far larger than the answer, because on Anthropic it caps
-     thinking AND response text together — and raising `effort` is precisely an
-     instruction to spend more of it thinking. At `high`/`max` the JSON is a rounding
-     error next to the reasoning, so a ceiling sized for the answer gets consumed before
-     the model starts writing and the reply arrives truncated mid-JSON. Anthropic's own
-     floor for `max` is 64000. chatTokens is untouched: the other providers never receive
-     an effort parameter, which is why they were never affected. */
+  balanced: { label: 'Balanced', anthropic: 'medium', maxTokens: 16000, chatTokens: 4000, ms: 120000, guide: '' },
+  /* Same reasoning as above, scaled: raising `effort` is precisely an instruction to
+     spend more of the budget thinking, so at `high`/`max` the JSON is a rounding error
+     next to the reasoning. Anthropic's own floor for `max` is 64000. chatTokens is
+     untouched: the other providers never receive an effort parameter. */
   deep: {
     label: 'Deep', anthropic: 'high', maxTokens: 32000, chatTokens: 12000, ms: 210000,
     guide: 'Reason thoroughly before answering. Work the history properly, weigh several candidate lines against both objectives, and discard the ones that fail.',
@@ -284,6 +287,17 @@ async function runPanel(env, G, count, body, eKey, emit = () => {}) {
 
   const E = effortOf(panelEffort(eKey));
   const deep = { effort: E.anthropic, maxTokens: E.maxTokens, chatTokens: E.chatTokens, deepThinking: true };
+  /* Per-attempt deadlines derived from the budget instead of a flat 90s/60s. `high` and
+     `max` are instructions to reason for longer, and a reasoning model routinely spends
+     more than 90 seconds on this prompt — so the flat deadline was killing seats that
+     were working correctly, then falling back to the smaller settings that truncate.
+     The budget mirrors what the client allows a panel run (see the abort timer in the
+     app); each of the two phases — seats, then chair — gets 45% of it, split two-thirds
+     to the first attempt and one-third to the fallback, so a worst case where both
+     phases retry still lands inside the client's patience. */
+  const panelBudget = Math.max(330000, E.ms + 60000);
+  const firstMs = Math.round(panelBudget * 0.3);
+  const retryMs = Math.round(panelBudget * 0.15);
   const candidates = Math.min(5, count + 2);
   const analystPrompt = buildPrompt(G, candidates, body, { panel: true, effort: panelEffort(eKey) });
 
@@ -317,12 +331,12 @@ async function runPanel(env, G, count, body, eKey, emit = () => {}) {
     };
     let seat;
     try {
-      seat = await attempt(analystPrompt, { ...deep, timeoutMs: 90000 });
+      seat = await attempt(analystPrompt, { ...deep, timeoutMs: firstMs });
     } catch (e1) {
       emit({ t: 'seat', slot: 'seat', state: 'retry', name: m.name, reason: `${String(e1.message || e1).slice(0, 90)} — retrying at standard settings` });
       try {
         // No opts = the single-pick request shape, which these providers demonstrably serve.
-        seat = await attempt(safePrompt, { timeoutMs: 60000 });
+        seat = await attempt(safePrompt, { timeoutMs: retryMs });
       } catch (e2) {
         emit({ t: 'seat', slot: 'seat', state: 'fail', name: m.name, ms: Date.now() - started, reason: String(e2.message || e2).slice(0, 120) });
         throw e2;
@@ -357,11 +371,11 @@ async function runPanel(env, G, count, body, eKey, emit = () => {}) {
     try {
       let picks;
       try {
-        picks = await chairTry({ ...deep, timeoutMs: 90000 });
+        picks = await chairTry({ ...deep, timeoutMs: firstMs });
       } catch (e1) {
         // Same fallback as the seats — don't lose the verdict to one malformed answer.
         emit({ t: 'seat', slot: 'chair', state: 'retry', name: chairModel.name, reason: `${String(e1.message || e1).slice(0, 90)} — retrying at standard settings` });
-        picks = await chairTry({ timeoutMs: 60000 });
+        picks = await chairTry({ timeoutMs: retryMs });
       }
       // chairTry only returns on a validated answer, so reaching here means a verdict.
       emit({ t: 'seat', slot: 'chair', state: 'done', name: chairModel.name, ms: Date.now() - started, lines: picks.lines.length, role: 'Verdict' });
@@ -571,6 +585,45 @@ async function readJson(r, label) {
   return data;
 }
 
+/* Reads a streamed /v1/messages response and returns the assistant's text.
+   Streaming is not a nicety here. max_tokens on these models runs to 32000–64000, and a
+   non-streamed request that size holds the socket open for minutes with zero bytes on it
+   — which is indistinguishable from a hung connection to every timeout between here and
+   Anthropic, and is why the deep and maximum efforts aborted rather than answered.
+   Streaming keeps bytes flowing for the whole run, so a deadline only fires on a request
+   that is genuinely stuck.
+
+   Only text_delta is collected: with thinking on the stream also carries thinking blocks,
+   whose deltas are thinking_delta and (display defaults to omitted) carry no text anyway. */
+async function readAnthropicStream(r) {
+  const reader = r.body.getReader();
+  const dec = new TextDecoder();
+  let buf = '', text = '', stopReason = null, outputTokens = 0, streamError = null;
+
+  for (;;) {
+    const { value, done } = await reader.read();
+    if (done) break;
+    buf += dec.decode(value, { stream: true });
+    let nl;
+    while ((nl = buf.indexOf('\n')) >= 0) {
+      const line = buf.slice(0, nl).trim();
+      buf = buf.slice(nl + 1);
+      if (!line.startsWith('data:')) continue; // event: lines carry no payload we need
+      const payload = line.slice(5).trim();
+      if (!payload) continue;
+      let ev;
+      try { ev = JSON.parse(payload); } catch { continue; }
+      if (ev.type === 'content_block_delta' && ev.delta?.type === 'text_delta') text += ev.delta.text || '';
+      else if (ev.type === 'message_delta') {
+        if (ev.delta?.stop_reason) stopReason = ev.delta.stop_reason;
+        if (ev.usage?.output_tokens != null) outputTokens = ev.usage.output_tokens;
+      } else if (ev.type === 'error') streamError = ev.error?.message || 'stream error';
+    }
+  }
+  if (streamError) throw new Error(streamError);
+  return { text, stopReason, outputTokens };
+}
+
 async function callAnthropic(apiKey, model, prompt, opts = {}) {
   const schema = {
     type: 'object',
@@ -581,7 +634,9 @@ async function callAnthropic(apiKey, model, prompt, opts = {}) {
           type: 'object',
           properties: {
             numbers: { type: 'array', items: { type: 'integer' } },
-            bonus: { type: ['integer', 'null'] },
+            // anyOf, not type:['integer','null'] — structured outputs documents anyOf as
+            // a supported construct and says nothing about type unions.
+            bonus: { anyOf: [{ type: 'integer' }, { type: 'null' }] },
             why: { type: 'string' },
           },
           required: ['numbers', 'bonus', 'why'],
@@ -593,6 +648,7 @@ async function callAnthropic(apiKey, model, prompt, opts = {}) {
     required: ['lines', 'note'],
     additionalProperties: false,
   };
+  const cap = opts.maxTokens || 16000;
   const r = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
     headers: {
@@ -603,32 +659,37 @@ async function callAnthropic(apiKey, model, prompt, opts = {}) {
     },
     body: JSON.stringify({
       model,
-      // Defaults below are the known-good single-model values. max_tokens caps thinking
-      // AND response text together, so the panel raises it alongside its higher effort.
-      max_tokens: opts.maxTokens || 6000,
+      // max_tokens caps thinking AND response text together, and thinking is on by
+      // default on opus-5 / always on for fable-5 — see the note on EFFORTS.maxTokens.
+      max_tokens: cap,
+      stream: true,
       fallbacks: 'default', // if a safety classifier ever declines, Anthropic retries on its recommended fallback model
-      // Thinking is already on by default for these models; only the panel asks for it
-      // explicitly, so a single pick sends the exact body it always sent.
+      // Thinking is already on by default for these models; the panel states it
+      // explicitly so the intent is visible in the request it sends.
       ...(opts.deepThinking ? { thinking: { type: 'adaptive' } } : {}),
       output_config: { effort: opts.effort || 'medium', format: { type: 'json_schema', schema } },
       messages: [{ role: 'user', content: prompt }],
     }),
     signal: withTimeout(opts.timeoutMs),
   });
-  const data = await readJson(r, 'Anthropic');
-  if (data.stop_reason === 'refusal') throw new Error('the model declined this request');
-  const text = (data.content || []).find((b) => b.type === 'text');
+  // A rejected request comes back as an ordinary non-streamed JSON error body, so let
+  // readJson raise it with the status and the provider's own wording attached.
+  if (!r.ok || !r.body) {
+    await readJson(r, 'Anthropic');
+    throw new Error('Anthropic accepted the request but sent no response body');
+  }
+
+  const { text, stopReason, outputTokens } = await readAnthropicStream(r);
+  if (stopReason === 'refusal') throw new Error('the model declined this request');
   // Hitting the ceiling is the one failure that does not look like a failure: HTTP 200,
-  // a text block, and JSON that simply stops halfway. Without this check it reaches the
+  // real text, and JSON that simply stops halfway. Without this check it reaches the
   // parser, comes back null, and surfaces as "no lines array" — which blames the model
   // for malformed output instead of naming the budget as the cause. Say what happened.
-  if (data.stop_reason === 'max_tokens' && !extractJson(text?.text || '')) {
-    const cap = opts.maxTokens || 6000;
-    const used = data.usage?.output_tokens;
-    throw new Error(`ran out of room before finishing the JSON — hit the ${cap}-token ceiling${used ? ` (used ${used})` : ''}. Thinking counts against it, so raise the ceiling or drop to a lower effort.`);
+  if (stopReason === 'max_tokens' && !extractJson(text)) {
+    throw new Error(`ran out of room before finishing the JSON — hit the ${cap}-token ceiling${outputTokens ? ` (used ${outputTokens})` : ''}. Thinking counts against it, so raise the ceiling or drop to a lower effort.`);
   }
-  if (!text) throw new Error('empty response');
-  return text.text;
+  if (!text.trim()) throw new Error('empty response');
+  return text;
 }
 
 async function callOpenAICompatible(provider, apiKey, model, prompt, opts = {}) {

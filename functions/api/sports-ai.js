@@ -140,6 +140,40 @@ function callModel(M, apiKey, prompt) {
   return callOpenAICompatible(M.provider, apiKey, M.id, prompt);
 }
 
+/* Reads a streamed /v1/messages response and returns the assistant's text. Streaming
+   keeps bytes on the socket for the whole run, so the deadline below only fires on a
+   request that is genuinely stuck rather than on one that is simply still thinking.
+   Only text_delta is collected — thinking blocks stream as thinking_delta and, with
+   display defaulting to omitted, carry no text anyway. */
+async function readAnthropicStream(r) {
+  const reader = r.body.getReader();
+  const dec = new TextDecoder();
+  let buf = '', text = '', stopReason = null, outputTokens = 0, streamError = null;
+
+  for (;;) {
+    const { value, done } = await reader.read();
+    if (done) break;
+    buf += dec.decode(value, { stream: true });
+    let nl;
+    while ((nl = buf.indexOf('\n')) >= 0) {
+      const line = buf.slice(0, nl).trim();
+      buf = buf.slice(nl + 1);
+      if (!line.startsWith('data:')) continue;
+      const payload = line.slice(5).trim();
+      if (!payload) continue;
+      let ev;
+      try { ev = JSON.parse(payload); } catch { continue; }
+      if (ev.type === 'content_block_delta' && ev.delta?.type === 'text_delta') text += ev.delta.text || '';
+      else if (ev.type === 'message_delta') {
+        if (ev.delta?.stop_reason) stopReason = ev.delta.stop_reason;
+        if (ev.usage?.output_tokens != null) outputTokens = ev.usage.output_tokens;
+      } else if (ev.type === 'error') streamError = ev.error?.message || 'stream error';
+    }
+  }
+  if (streamError) throw new Error(streamError);
+  return { text, stopReason, outputTokens };
+}
+
 async function callAnthropic(apiKey, model, prompt) {
   const schema = {
     type: 'object',
@@ -153,6 +187,7 @@ async function callAnthropic(apiKey, model, prompt) {
     required: ['pick', 'market', 'confidence', 'edge', 'keyFactors', 'risks', 'summary'],
     additionalProperties: false,
   };
+  const CAP = 16000;
   const r = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
     headers: {
@@ -163,18 +198,35 @@ async function callAnthropic(apiKey, model, prompt) {
     },
     body: JSON.stringify({
       model,
-      max_tokens: 6000,
+      /* max_tokens caps thinking AND response text together, and thinking is on by
+         default on claude-opus-5 / always on for claude-fable-5. 6000 was inherited from
+         the pre-thinking Opus models; on the current ones a medium-effort run can spend
+         all of it reasoning and then truncate mid-JSON, which reads as a failure right at
+         the end of an otherwise healthy request. A ceiling that is never reached costs
+         nothing — `effort` decides what is actually spent — so leave real headroom. */
+      max_tokens: CAP,
+      stream: true,
       fallbacks: 'default',
       output_config: { effort: 'medium', format: { type: 'json_schema', schema } },
       messages: [{ role: 'user', content: prompt }],
     }),
-    signal: withTimeout(90000),
+    signal: withTimeout(120000),
   });
-  const data = await readJson(r, 'Anthropic');
-  if (data.stop_reason === 'refusal') throw new Error('the model declined this request');
-  const text = (data.content || []).find((b) => b.type === 'text');
-  if (!text) throw new Error('empty response');
-  return text.text;
+  // A rejected request comes back as an ordinary non-streamed JSON error body.
+  if (!r.ok || !r.body) {
+    await readJson(r, 'Anthropic');
+    throw new Error('Anthropic accepted the request but sent no response body');
+  }
+
+  const { text, stopReason, outputTokens } = await readAnthropicStream(r);
+  if (stopReason === 'refusal') throw new Error('the model declined this request');
+  // HTTP 200 with JSON that stops halfway otherwise surfaces as a parse failure and
+  // blames the model for malformed output instead of naming the budget. Say what happened.
+  if (stopReason === 'max_tokens' && !extractJson(text)) {
+    throw new Error(`ran out of room before finishing the JSON — hit the ${CAP}-token ceiling${outputTokens ? ` (used ${outputTokens})` : ''}. Thinking counts against it.`);
+  }
+  if (!text.trim()) throw new Error('empty response');
+  return text;
 }
 
 async function callOpenAICompatible(provider, apiKey, model, prompt) {
