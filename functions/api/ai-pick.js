@@ -5,7 +5,7 @@
 // Env vars (Cloudflare Pages → Settings → Environment variables):
 //   ANTHROPIC_API_KEY  — enables Fable 5 + Opus 5
 //   OPENAI_API_KEY     — enables GPT-5.6 Sol + Terra
-//   XAI_API_KEY        — enables Grok 4.5
+//   XAI_API_KEY        — enables Grok 4.6
 //   GEMINI_API_KEY     — enables Gemini 3.x models (GOOGLE_API_KEY also accepted)
 //   APP_USER / APP_PASSWORD — login gate (defaults admin / admin if unset)
 //   APP_PASSCODE       — optional; if set, requests must carry the matching x-app-pass header
@@ -21,7 +21,7 @@ const MODELS = {
   super: { provider: 'ensemble', id: null, name: 'Super Intelligence', ensemble: true },
   fable: { provider: 'anthropic', id: 'claude-fable-5', name: 'Claude Fable 5' },
   opus: { provider: 'anthropic', id: 'claude-opus-5', name: 'Claude Opus 5' },
-  grok: { provider: 'xai', id: 'grok-4.5', name: 'Grok 4.5' },
+  grok: { provider: 'xai', id: 'grok-4.6', name: 'Grok 4.6' },
   sol: { provider: 'openai', id: 'gpt-5.6-sol', name: 'GPT-5.6 Sol' },
   terra: { provider: 'openai', id: 'gpt-5.6-terra', name: 'GPT-5.6 Terra' },
   geminipro: { provider: 'google', id: 'gemini-3.1-pro-preview', name: 'Gemini 3.1 Pro' },
@@ -422,13 +422,34 @@ function matrixTargets(G) {
 // body.stats. This is the "based on data" ground truth — what draws actually look like,
 // not just what the math says they should.
 function statsLine(G, s) {
-  if (!s || G.digits) return '';
+  if (!s) return '';
+  if (G.digits && Array.isArray(s.digitPos)) {
+    const lines = s.digitPos.map((p) =>
+      `pos ${p.pos}: hot ${ (p.hot || []).join(', ') || '—' }; cold ${ (p.cold || []).join(', ') || '—' }`);
+    return `Digit heat by position (last ${s.draws} of ${s.totalHistory || s.draws} drawings — descriptive only, not predictive):\n${lines.join('\n')}`;
+  }
+  if (G.digits) return '';
   const bits = [];
-  if (Number.isFinite(s.sumLo) && Number.isFinite(s.sumHi)) bits.push(`sums usually ${s.sumLo}–${s.sumHi} (avg ${s.sumMean})`);
+  if (Number.isFinite(s.sumLo) && Number.isFinite(s.sumHi)) {
+    bits.push(`sums usually ${s.sumLo}–${s.sumHi} (avg ${s.sumMean}; p10–p90 ${s.sumP10 ?? '?'}–${s.sumP90 ?? '?'})`);
+  }
   if (Number.isFinite(s.oddAvg)) bits.push(`about ${s.oddAvg} odd / ${s.evenAvg} even`);
-  if (Number.isFinite(s.highAvg)) bits.push(`about ${s.highAvg} above the midpoint / ${s.lowAvg} below`);
-  if (!bits.length) return '';
-  return `What real draws actually look like (measured over the last ${s.draws || 'many'} draws): ${bits.join('; ')}.`;
+  if (Number.isFinite(s.highAvg)) bits.push(`about ${s.highAvg} above midpoint ${s.mid} / ${s.lowAvg} below`);
+  if (Number.isFinite(s.spreadAvg)) bits.push(`avg ${s.spreadAvg} decade-groups covered`);
+  if (Number.isFinite(s.runAvg)) bits.push(`avg longest consecutive run ${s.runAvg}`);
+  if (Number.isFinite(s.over31Avg)) bits.push(`avg ${s.over31Avg} numbers above 31`);
+  if (!bits.length && !(s.hotDetail || s.coldDetail)) return '';
+  const extra = [];
+  if (Array.isArray(s.hotDetail) && s.hotDetail.length) extra.push(`Hottest (count + gap): ${s.hotDetail.join(', ')}`);
+  if (Array.isArray(s.coldDetail) && s.coldDetail.length) extra.push(`Longest missing: ${s.coldDetail.join(', ')}`);
+  if (Array.isArray(s.overFreq) && s.overFreq.length) extra.push(`Above expected frequency: ${s.overFreq.join(', ')}`);
+  if (Array.isArray(s.underFreq) && s.underFreq.length) extra.push(`Below expected frequency: ${s.underFreq.join(', ')}`);
+  if (Array.isArray(s.topPairs) && s.topPairs.length) extra.push(`Most co-drawn pairs: ${s.topPairs.join(', ')}`);
+  if (Array.isArray(s.decades) && s.decades.length) extra.push(`Decade share of balls drawn: ${s.decades.join('; ')}`);
+  if (Array.isArray(s.bonusHot) && s.bonusHot.length) extra.push(`Bonus hot: ${s.bonusHot.join(', ')}`);
+  if (Array.isArray(s.bonusCold) && s.bonusCold.length) extra.push(`Bonus longest missing: ${s.bonusCold.join(', ')}`);
+  if (Array.isArray(s.avoidExact) && s.avoidExact.length) extra.push(`Do NOT copy these recent winning sets (crowd magnets): ${s.avoidExact.join(', ')}`);
+  return `Measured draw profile over the last ${s.draws} of ${s.totalHistory || s.draws} draws (expected hits/number ≈ ${s.expected ?? '?'}):\n- Shape: ${bits.join('; ') || 'see detail below'}.\n${extra.map((e) => '- ' + e).join('\n')}`;
 }
 
 function gameContext(G, body) {
@@ -436,10 +457,10 @@ function gameContext(G, body) {
     ? `${G.digits} digits, each 0-9 (order matters for a straight bet)`
     : `${G.pick} distinct numbers from 1 to ${G.max}` + (G.bonusMax ? `, plus one ${G.bonus} from 1 to ${G.bonusMax}` : '');
   const recent = Array.isArray(body.recent) && body.recent.length
-    ? `Recent real draws (oldest to newest):\n${body.recent.slice(-20).map(String).join('\n')}`
+    ? `Recent real draws (oldest to newest, ${body.recent.length} shown):\n${body.recent.slice(-40).map(String).join('\n')}`
     : 'No recent draw data provided.';
-  const hot = Array.isArray(body.hot) && body.hot.length ? `Most frequently drawn recently: ${body.hot.join(', ')}` : '';
-  const cold = Array.isArray(body.cold) && body.cold.length ? `Longest without appearing: ${body.cold.join(', ')}` : '';
+  const hot = Array.isArray(body.hot) && body.hot.length ? `Quick hot list: ${body.hot.join(', ')}` : '';
+  const cold = Array.isArray(body.cold) && body.cold.length ? `Quick cold/missing list: ${body.cold.join(', ')}` : '';
   const jackpot = body.jackpot ? `Current jackpot: ${body.jackpot}.` : '';
 
   const t = matrixTargets(G);
@@ -504,15 +525,16 @@ ${gameContext(G, body)}
 ${OBJECTIVES(G)}
 
 Work through it in this order before you answer:
-1. Take the statistical targets above as your shape spec (sum band, odd/even, high/low, spread). Cross-check them against the measured real-draw shape and the recent draws; where they differ, trust the measured data.
-2. Note which zones of the board are over-played by other people (see Objective B).
-3. Build ${count} candidate line${count > 1 ? 's' : ''} that sit inside the target shape while staying out of the crowded zones on popularity.
-4. For each line, actually compute its sum and its odd/even and high/low counts, confirm they fall in the target bands, and fix any that miss. Make the lines different from each other — do not submit ${count} variations of one idea.
+1. Read the measured draw profile first (sums, splits, decade share, hot/cold detail, co-drawn pairs, avoidExact). Treat those numbers as ground truth — do not invent counts from the recent list.
+2. Take the statistical targets as your shape spec (sum band, odd/even, high/low, spread). Where measured real-draw shape differs from theory, trust the measured data.
+3. Note crowd-crowded zones (Objective B) and cross-check against avoidExact — never resubmit a recent winning set, and avoid near-copies that only swap one ball.
+4. Build ${count} candidate line${count > 1 ? 's' : ''} that sit inside the target shape while staying out of crowded zones. Mix mid-frequency numbers with selective high/low-frequency ones; do not dump the entire hot list into one line.
+5. For each line, actually compute its sum and its odd/even and high/low counts, confirm they fall in the target bands, and fix any that miss. Make the lines different from each other — do not submit ${count} variations of one idea.
 
-For each line write a "why" (max 160 chars) naming the concrete reason it passes: its sum, its split, and the crowd pattern it dodges. Be specific and readable, not generic. Never promise better odds.
+For each line write a "why" (max 180 chars) that cites at least one concrete measured figure (e.g. its sum vs the measured sum band, a decade-share fact, or a crowd pattern avoided). Be specific and readable, not generic. Never promise better odds.
 ${forPanel
-    ? 'For "note" (max 220 chars): give your read of this game\'s history — the sum band, the splits, and anything genuinely notable. Another model will compare your read against other models\', so be precise and state what you are confident about versus guessing.'
-    : 'For "note" (max 200 chars): one short paragraph in your own voice on how you built these.'}
+    ? 'For "note" (max 220 chars): give your read of this game\'s history using the measured profile — the sum band, the splits, decade share, and anything genuinely notable. Another model will compare your read against other models\', so be precise and state what you are confident about versus guessing.'
+    : 'For "note" (max 220 chars): one short paragraph in your own voice on how the measured profile shaped these lines.'}
 
 ${OUTPUT_SHAPE(G)}`;
 }

@@ -737,43 +737,6 @@ details.rt[open] summary::after{rotate:45deg}
 details.rt p{color:var(--ink2); font-size:13px; margin:9px 0 2px; line-height:1.6}
 .footnote{margin:26px 4px 8px; text-align:center; font-size:11px; color:var(--ink3); line-height:1.7}
 .footnote b{color:var(--ink2)}
-/* ============ SPORTSBOOK ============ */
-.sportbar{display:flex; gap:7px; overflow-x:auto; overscroll-behavior-x:contain; scrollbar-width:none; margin:12px 0 4px; padding-bottom:2px}
-.sportbar::-webkit-scrollbar{display:none}
-.sportbar button{flex:0 0 auto; display:flex; align-items:center; gap:6px; padding:8px 13px; border-radius:999px; border:1px solid var(--card-edge); background:color-mix(in srgb, var(--card-solid) 55%, transparent); color:var(--ink2); font-weight:700; font-size:13px; cursor:pointer; transition:.15s}
-.sportbar button.on{color:#1c1305; border-color:transparent; background:linear-gradient(180deg, var(--gold-hi), var(--gold) 45%, var(--gold-deep))}
-.sportmeta{display:flex; align-items:baseline; gap:8px; flex-wrap:wrap; margin:6px 2px 2px}
-.oddsboard{display:flex; flex-direction:column; gap:12px; margin-top:12px}
-.gamecard{position:relative}
-.gchead{display:flex; align-items:center; gap:10px; margin-bottom:10px}
-.gcteams{font-weight:800; line-height:1.35}
-.gcteams .at{color:var(--ink3); font-weight:600; font-size:12px; margin:0 4px}
-.gctime{margin-left:auto; text-align:right; font-size:11px; color:var(--ink3); white-space:nowrap}
-.mkts{display:grid; grid-template-columns:repeat(3,1fr); gap:8px}
-.mkt{border:1px solid var(--card-edge); border-radius:14px; overflow:hidden}
-.mkt-h{text-align:center; font-size:10px; letter-spacing:.08em; text-transform:uppercase; color:var(--ink3); padding:5px 4px 3px; font-weight:700}
-.mkt-c{display:flex; justify-content:space-between; align-items:center; gap:6px; padding:7px 9px; font-size:13px; border-top:1px solid color-mix(in srgb, var(--card-edge) 60%, transparent)}
-.mkt-c .lbl{color:var(--ink2); font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
-.mkt-c .px{font-weight:800; font-variant-numeric:tabular-nums}
-.mkt-c .px.pos{color:var(--ok)} .mkt-c .px.neg{color:var(--ink)}
-.gcbtns{display:flex; gap:8px; margin-top:10px; flex-wrap:wrap}
-.aibox{margin-top:11px; border:1px solid var(--gold-line, var(--card-edge)); border-radius:14px; padding:12px 13px; background:color-mix(in srgb, var(--gold) 7%, transparent)}
-.aibox .apick{display:flex; align-items:center; gap:9px; flex-wrap:wrap}
-.aibox .apick b{font-size:16px}
-.conf{display:inline-flex; align-items:center; gap:6px; font-size:11px; font-weight:800; text-transform:uppercase; letter-spacing:.05em; padding:3px 9px; border-radius:999px}
-.conf.low{color:var(--ink2); background:color-mix(in srgb, var(--ink3) 20%, transparent)}
-.conf.medium{color:#8a6d00; background:color-mix(in srgb, var(--gold) 26%, transparent)}
-.conf.high{color:#0b6b3a; background:color-mix(in srgb, var(--ok) 22%, transparent)}
-.alist{margin:9px 0 0; padding:0; list-style:none; display:flex; flex-direction:column; gap:5px}
-.alist li{position:relative; padding-left:18px; font-size:13px; color:var(--ink2); line-height:1.5}
-.alist li::before{content:""; position:absolute; left:4px; top:8px; width:5px; height:5px; border-radius:50%; background:var(--gold)}
-.alist.risks li::before{background:var(--bad)}
-.rgnote{margin-top:14px; font-size:11px; color:var(--ink3); line-height:1.6; text-align:center}
-.rgnote b{color:var(--ink2)}
-.betrow{display:flex; align-items:center; gap:10px; padding:9px 0; border-top:1px solid color-mix(in srgb, var(--card-edge) 55%, transparent)}
-.betrow:first-of-type{border-top:0}
-.betrow .bp{font-weight:700; font-size:14px}
-.betrow .bm{font-size:11px; color:var(--ink3)}
 /* ============ DESKTOP (≥1000px): wide multi-column views, same floating dock ============ */
 @media (min-width:1000px){
   /* home: sticky stack of big jackpot cards + content column */
@@ -818,9 +781,6 @@ details.rt p{color:var(--ink2); font-size:13px; margin:9px 0 2px; line-height:1.
   #view-budget.on > h2.sect{grid-column:1/-1}
   #view-budget.on > .card:has(#ring){grid-column:1; grid-row:2 / span 20; position:sticky; top:86px}
   #view-budget.on > .footnote{grid-column:1/-1}
-  /* sportsbook: odds board flows into two masonry-style columns on wide screens */
-  #view-sports.on .oddsboard{column-count:2; column-gap:14px; display:block}
-  #view-sports.on .oddsboard > .gamecard{break-inside:avoid; margin:0 0 14px}
 }
 /* ============ GRAPHICAL LOGIN GATE ============ */
 /* ---------- AI: live status, effort selector, reasoning ---------- */
@@ -1027,7 +987,6 @@ details.rt p{color:var(--ink2); font-size:13px; margin:9px 0 2px; line-height:1.
     <section class="view on" id="view-home"></section>
     <section class="view" id="view-lab"></section>
     <section class="view" id="view-tickets"></section>
-    <section class="view" id="view-sports"></section>
     <section class="view" id="view-stats"></section>
     <section class="view" id="view-budget"></section>
   </main>
@@ -1036,7 +995,6 @@ details.rt p{color:var(--ink2); font-size:13px; margin:9px 0 2px; line-height:1.
     <button data-v="home" class="on"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M3 11 12 3l9 8v9a1 1 0 0 1-1 1h-5v-6h-6v6H4a1 1 0 0 1-1-1z"/></svg>Home</button>
     <button data-v="lab"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M9 3h6M10 3v6l-5.5 9.5A2 2 0 0 0 6.2 21h11.6a2 2 0 0 0 1.7-2.5L14 9V3"/><path d="M7.5 15h9"/></svg>Lab</button>
     <button data-v="tickets"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M3 9a2 2 0 0 0 0 6v3a1 1 0 0 0 1 1h16a1 1 0 0 0 1-1v-3a2 2 0 0 1 0-6V6a1 1 0 0 0-1-1H4a1 1 0 0 0-1 1z"/><path d="M13 5v2m0 4v2m0 4v2" stroke-dasharray="1 3"/></svg>Tickets</button>
-    <button data-v="sports"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="12" rx="9" ry="5.5" transform="rotate(-30 12 12)"/><path d="M9.2 14.8 14.8 9.2M9.9 11.1l3 3M11.1 9.9l3 3"/></svg>Sports</button>
     <button data-v="stats"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 20V10m6 10V4m6 16v-7m4 7H2"/></svg>Stats</button>
     <button data-v="budget"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v10M9.5 9.8c0-1 1.1-1.8 2.5-1.8s2.5.8 2.5 1.8c0 2.6-5 1.6-5 4.3 0 1 1.1 1.9 2.5 1.9s2.5-.8 2.5-1.8"/></svg>Budget</button>
   </nav>
@@ -1317,8 +1275,6 @@ const DEFAULTS = {
   theme: 'auto', lastSync: 0,
   ticketsAt: 0, backupAt: 0, // last ticket saved / last backup taken — drives the ⚠ backup nudge
   aiEffort: 'balanced',      // how hard the AI works; 'balanced' is the known-good default
-  sport: 'nfl',             // last-viewed Sportsbook league (football first)
-  sportsBets: [],           // picks the user chose to track from the Sportsbook
 };
 let S;
 try { S = Object.assign({}, DEFAULTS, JSON.parse(localStorage.getItem('jhq') || '{}')); }
@@ -1498,6 +1454,144 @@ function freqTable(g, window) {
   use.forEach((r, i) => r.n.forEach(n => { f[n]++; last[n] = i; }));
   return { f, last, draws: use.length, expected: use.length * M.pick / M.max };
 }
+/* Compact analysis pack for AI Pick. The model cannot recompute this from 15 draw
+   lines — we measure it here and hand it the numbers so every pick is grounded in
+   the same history the Stats tab shows. Does not change true odds; it shapes lines
+   and crowd-avoidance with real measured targets. */
+function buildAiDossier(g) {
+  const G = GAMES[g];
+  const rows = RES[g] || [];
+  const total = rows.length;
+  if (!total) return { recent: [], hot: [], cold: [], stats: null };
+
+  if (G.digits) {
+    const win = Math.min(80, total);
+    const use = rows.slice(-win);
+    const pos = Array.from({ length: G.digits }, () => new Array(10).fill(0));
+    use.forEach(r => [...String(r.n)].forEach((ch, i) => { if (i < G.digits) pos[i][+ch]++; }));
+    const byPos = pos.map((row, i) => {
+      const ranked = row.map((c, d) => ({ d, c })).sort((a, b) => b.c - a.c || a.d - b.d);
+      return {
+        pos: i + 1,
+        hot: ranked.slice(0, 3).map(x => `${x.d}(${x.c})`),
+        cold: ranked.slice(-3).reverse().map(x => `${x.d}(${x.c})`),
+      };
+    });
+    const recent = use.slice(-30).map(r => `${r.d}${r.t ? '/' + r.t : ''}: ${r.n}${r.f ? ' FB' + r.f : ''}`);
+    return {
+      recent,
+      hot: byPos.flatMap(p => p.hot.slice(0, 1).map(h => `p${p.pos}:${h}`)),
+      cold: byPos.flatMap(p => p.cold.slice(0, 1).map(c => `p${p.pos}:${c}`)),
+      stats: { draws: win, totalHistory: total, digitPos: byPos },
+    };
+  }
+
+  const M = G.matrix;
+  if (!M || M.pick < 2) {
+    return { recent: rows.slice(-20).map(r => `${r.d}: ${Array.isArray(r.n) ? r.n.join(' ') : r.n}`), hot: [], cold: [], stats: null };
+  }
+
+  const win = Math.min(120, total);
+  const use = rows.slice(-win);
+  const mid = Math.round((M.max + 1) / 2);
+  const { f, last, draws, expected } = freqTable(g, win);
+
+  const sums = [], odds = [], highs = [], spreads = [], runs = [], over31 = [];
+  const decadeHits = new Array(Math.ceil(M.max / 10)).fill(0);
+  const pairCount = new Map();
+  use.forEach(r => {
+    const n = [...r.n].sort((a, b) => a - b);
+    sums.push(n.reduce((a, b) => a + b, 0));
+    odds.push(n.filter(x => x % 2).length);
+    highs.push(n.filter(x => x > mid).length);
+    spreads.push(decadeSpread(n, M.max));
+    runs.push(maxRun(n));
+    over31.push(n.filter(x => x > 31).length);
+    n.forEach(x => { decadeHits[Math.floor((x - 1) / 10)]++; });
+    for (let i = 0; i < n.length; i++) for (let j = i + 1; j < n.length; j++) {
+      const key = n[i] + '-' + n[j];
+      pairCount.set(key, (pairCount.get(key) || 0) + 1);
+    }
+  });
+  const avg = (a) => a.length ? a.reduce((x, y) => x + y, 0) / a.length : 0;
+  const pctile = (a, p) => {
+    if (!a.length) return 0;
+    const s = [...a].sort((x, y) => x - y);
+    const i = Math.min(s.length - 1, Math.max(0, Math.round((p / 100) * (s.length - 1))));
+    return s[i];
+  };
+
+  const items = Array.from({ length: M.max }, (_, i) => {
+    const n = i + 1;
+    const gap = last[n] < 0 ? draws : draws - 1 - last[n];
+    return { n, c: f[n], gap, vs: expected ? +((f[n] - expected) / expected).toFixed(2) : 0 };
+  });
+  const hot = [...items].sort((a, b) => b.c - a.c || a.n - b.n).slice(0, 8);
+  const cold = [...items].sort((a, b) => b.gap - a.gap || a.n - b.n).slice(0, 8);
+  const under = [...items].filter(x => x.vs <= -0.25).sort((a, b) => a.vs - b.vs || a.n - b.n).slice(0, 8);
+  const over = [...items].filter(x => x.vs >= 0.25).sort((a, b) => b.vs - a.vs || a.n - b.n).slice(0, 8);
+
+  const pairs = [...pairCount.entries()].sort((a, b) => b[1] - a[1]).slice(0, 8)
+    .map(([k, c]) => ({ pair: k, c }));
+
+  let bonusHot = [], bonusCold = [];
+  if (M.bonusMax) {
+    const bf = new Array(M.bonusMax + 1).fill(0);
+    const blast = new Array(M.bonusMax + 1).fill(-1);
+    use.forEach((r, i) => { if (r.b != null) { bf[r.b]++; blast[r.b] = i; } });
+    const bItems = Array.from({ length: M.bonusMax }, (_, i) => {
+      const n = i + 1;
+      return { n, c: bf[n], gap: blast[n] < 0 ? draws : draws - 1 - blast[n] };
+    });
+    bonusHot = [...bItems].sort((a, b) => b.c - a.c).slice(0, 5);
+    bonusCold = [...bItems].sort((a, b) => b.gap - a.gap).slice(0, 5);
+  }
+
+  const decades = decadeHits.map((c, i) => ({
+    band: `${i * 10 + 1}–${Math.min(M.max, (i + 1) * 10)}`,
+    c,
+    share: draws ? +((c / (draws * M.pick)) * 100).toFixed(1) : 0,
+  }));
+
+  const recent = use.slice(-30).map(r =>
+    `${r.d}: ${[...r.n].sort((a, b) => a - b).join(' ')}${r.b != null ? ' +' + r.b : ''}`);
+  // Exact recent winning sets — models must not copy these (crowd magnet).
+  const avoidExact = use.slice(-12).map(r =>
+    [...r.n].sort((a, b) => a - b).join('-') + (r.b != null ? '+' + r.b : ''));
+
+  return {
+    recent,
+    hot: hot.map(x => x.n),
+    cold: cold.map(x => x.n),
+    stats: {
+      draws,
+      totalHistory: total,
+      expected: +expected.toFixed(2),
+      sumMean: Math.round(avg(sums)),
+      sumLo: pctile(sums, 16),
+      sumHi: pctile(sums, 84),
+      sumP10: pctile(sums, 10),
+      sumP90: pctile(sums, 90),
+      oddAvg: +avg(odds).toFixed(1),
+      evenAvg: +(M.pick - avg(odds)).toFixed(1),
+      highAvg: +avg(highs).toFixed(1),
+      lowAvg: +(M.pick - avg(highs)).toFixed(1),
+      mid,
+      spreadAvg: +avg(spreads).toFixed(1),
+      runAvg: +avg(runs).toFixed(1),
+      over31Avg: +avg(over31).toFixed(1),
+      hotDetail: hot.map(x => `${x.n}×${x.c} (gap ${x.gap})`),
+      coldDetail: cold.map(x => `${x.n} gap ${x.gap} (×${x.c})`),
+      overFreq: over.map(x => `${x.n} ${x.vs >= 0 ? '+' : ''}${Math.round(x.vs * 100)}%`),
+      underFreq: under.map(x => `${x.n} ${Math.round(x.vs * 100)}%`),
+      topPairs: pairs.map(p => `${p.pair} (${p.c}×)`),
+      decades: decades.map(d => `${d.band}: ${d.share}%`),
+      bonusHot: bonusHot.map(x => `${x.n}×${x.c}`),
+      bonusCold: bonusCold.map(x => `${x.n} gap ${x.gap}`),
+      avoidExact,
+    },
+  };
+}
 function weightedSample(weights, count) {
   const picked = new Set(); const w = weights.slice();
   while (picked.size < count) {
@@ -1556,7 +1650,7 @@ const STRATS = {
     },
   },
   manual: { name: 'My Numbers', ico: '✍️', truth: 'Pick your own — the Lab grades the crowd-factor as you tap.', desc: 'Tap the board to build your line and get instant analysis.', manual: true },
-  ai: { name: 'AI Pick', ico: '✨', truth: 'No AI can beat randomness. What they can do: shape a line that matches the profile of real winning draws, and keep it off the numbers everyone else plays — that part is worth real money if it hits.', desc: 'Super Intelligence puts every maker on a panel and has one adjudicate them — or pick a single model. Each explains every line it builds.', ai: true },
+  ai: { name: 'AI Pick', ico: '✨', truth: 'No AI can beat randomness. What they can do: read the full measured draw history (sums, splits, decade share, pairs, hot/cold), shape a line that matches real winning profiles, and keep it off numbers everyone else plays — that last part is worth real money if it hits.', desc: 'Sends a full history dossier to the model. Super Intelligence puts every maker on a panel and has one adjudicate them — or pick a single model. Each explains every line it builds.', ai: true },
 };
 
 /* official maker logos: Claude spark for Anthropic models, OpenAI blossom for GPT,
@@ -1827,7 +1921,7 @@ let AI = { checked: false, ok: false, models: {}, passReq: false };
 /* shown before the server has answered (or when it can't) so the picker is always visible */
 const AI_FALLBACK_MODELS = {
   super: { name: 'Super Intelligence' },
-  fable: { name: 'Claude Fable 5' }, opus: { name: 'Claude Opus 5' }, grok: { name: 'Grok 4.5' },
+  fable: { name: 'Claude Fable 5' }, opus: { name: 'Claude Opus 5' }, grok: { name: 'Grok 4.6' },
   sol: { name: 'GPT-5.6 Sol' }, terra: { name: 'GPT-5.6 Terra' },
   geminipro: { name: 'Gemini 3.1 Pro' }, geminiflash: { name: 'Gemini 3.6 Flash' }, gemini2flash: { name: 'Gemini 3.5 Flash' },
 };
@@ -2044,34 +2138,13 @@ async function aiGenerate() {
     panel ? 'The panel is deliberating…' : name + ' is thinking…',
     panel
       ? 'Every maker answers in parallel, then one adjudicates all of them.'
-      : `${E.label} effort · matching the typical draw profile and dodging crowded numbers.`,
+      : `${E.label} effort · full draw history dossier · matching profile + dodging crowds.`,
     aiModel, true);
-  const recent = (RES[labGame] || []).slice(-25).map(r => G.digits
-    ? `${r.d}${r.t ? '/' + r.t : ''}: ${r.n}${r.f ? ' FB' + r.f : ''}`
-    : `${r.d}: ${r.n.join(' ')}${r.b != null ? ' +' + r.b : ''}`);
-  let hot = [], cold = [], stats = null;
-  if (!G.digits && G.matrix && G.matrix.pick > 1) {
-    const { f, last, draws } = freqTable(labGame, 60);
-    const items = Array.from({ length: G.matrix.max }, (_, i) => ({ n: i + 1, c: f[i + 1], gap: last[i + 1] < 0 ? draws : draws - 1 - last[i + 1] }));
-    hot = [...items].sort((a, b) => b.c - a.c).slice(0, 5).map(x => x.n);
-    cold = [...items].sort((a, b) => b.gap - a.gap).slice(0, 5).map(x => x.n);
-    // Empirical shape of real draws — the "based on data" ground truth we hand the AI.
-    const pick = G.matrix.pick, mid = (G.matrix.max + 1) / 2;
-    const rows = (RES[labGame] || []).slice(-120).filter(r => Array.isArray(r.n) && r.n.length === pick);
-    if (rows.length >= 12) {
-      const sums = rows.map(r => r.n.reduce((a, b) => a + b, 0));
-      const mean = sums.reduce((a, b) => a + b, 0) / sums.length;
-      const sd = Math.sqrt(sums.reduce((a, b) => a + (b - mean) ** 2, 0) / sums.length);
-      const oddAvg = rows.reduce((a, r) => a + r.n.filter(n => n % 2).length, 0) / rows.length;
-      const highAvg = rows.reduce((a, r) => a + r.n.filter(n => n > mid).length, 0) / rows.length;
-      stats = {
-        draws: rows.length,
-        sumLo: Math.round(mean - sd), sumHi: Math.round(mean + sd), sumMean: Math.round(mean),
-        oddAvg: +oddAvg.toFixed(1), evenAvg: +(pick - oddAvg).toFixed(1),
-        highAvg: +highAvg.toFixed(1), lowAvg: +(pick - highAvg).toFixed(1),
-      };
-    }
-  }
+  const dossier = buildAiDossier(labGame);
+  const recent = dossier.recent;
+  const hot = dossier.hot;
+  const cold = dossier.cold;
+  const stats = dossier.stats;
   const J = (G.jackpotSeed || G.fixedJackpot) ? jackpotOf(labGame) : null;
   // The panel runs two rounds across several providers, so it needs a longer leash
   // than a single model — the server bounds each individual call on its own side.
@@ -3328,276 +3401,6 @@ function confetti() {
     if (el < 2.3) requestAnimationFrame(tick); else ctx.clearRect(0, 0, cv.width, cv.height);
   })(t0);
 }
-/* ============================================================
-   SPORTSBOOK — live odds board + AI matchup reads (self-contained)
-   Additive: shares no state with the lottery views. Odds come from
-   /api/odds (The Odds API proxy, sample fallback); reads from /api/sports-ai.
-   ============================================================ */
-const SPORTS_UI = [
-  { id: 'nfl', name: 'NFL', emoji: '🏈' },
-  { id: 'ncaaf', name: 'CFB', emoji: '🏈' },
-  { id: 'nba', name: 'NBA', emoji: '🏀' },
-  { id: 'ncaab', name: 'CBB', emoji: '🏀' },
-  { id: 'mlb', name: 'MLB', emoji: '⚾' },
-  { id: 'nhl', name: 'NHL', emoji: '🏒' },
-  { id: 'epl', name: 'EPL', emoji: '⚽' },
-  { id: 'mls', name: 'MLS', emoji: '⚽' },
-  { id: 'mma', name: 'UFC', emoji: '🥊' },
-];
-let sportsCache = {};       // sportId -> { games, sample, note, ts }  (session only)
-let sportsBusy = false;
-let sportsAI = { checked: false, ok: false };
-
-// Endpoints mirror aiEndpoint(): same-origin /api when served, or the configured
-// remote origin on file://. Returns null when there is no reachable backend.
-function apiBase() {
-  if (typeof window !== 'undefined' && window.claude) return null;
-  if (location.protocol === 'file:') {
-    if (!S.aiEndpoint) return null;
-    return S.aiEndpoint.trim().replace(/\/+$/, '').replace(/\/api\/ai-pick$/, '');
-  }
-  return '';
-}
-function oddsEndpoint() { const b = apiBase(); return b === null ? null : (b ? b + '/api/odds' : 'api/odds'); }
-function sportsAiEndpoint() { const b = apiBase(); return b === null ? null : (b ? b + '/api/sports-ai' : 'api/sports-ai'); }
-
-const fmtAmerican = (v) => (typeof v === 'number' ? (v > 0 ? '+' + v : String(v)) : '—');
-const shortTeam = (name) => { if (!name) return ''; const p = String(name).trim().split(/\s+/); return p[p.length - 1]; };
-const cssEsc = (s) => String(s).replace(/["\\]/g, '\\$&');
-function fmtKick(iso) {
-  if (!iso) return '';
-  const d = new Date(iso); if (isNaN(d)) return '';
-  const ms = d - Date.now();
-  if (ms > 0 && ms < 36 * 3600e3) { const h = Math.floor(ms / 3600e3), m = Math.floor(ms / 60000) % 60; return h < 1 ? `in ${m}m` : `in ${h}h`; }
-  return d.toLocaleDateString(undefined, { weekday: 'short' }) + ' ' + d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
-}
-
-// Client-side demo slates so the whole section works with no backend and no keys.
-// Used when there's no reachable /api, or the feed returns nothing.
-function sampleOddsClient(sport) {
-  const soon = (h) => new Date(Date.now() + h * 3600e3).toISOString();
-  const g = (i, away, home, h, ml, spread, total) => ({ id: `demo-${sport}-${i}`, away, home, commence: soon(h), books: 6, ml, spread, total, sample: true });
-  const sets = {
-    nfl: [
-      g(1, 'Dallas Cowboys', 'Philadelphia Eagles', 6, { away: 145, home: -170 }, { point: 3.5, away: 100, home: -120 }, { point: 47.5, over: -110, under: -110 }),
-      g(2, 'Kansas City Chiefs', 'Buffalo Bills', 28, { away: -125, home: 105 }, { point: -1.5, away: -110, home: -110 }, { point: 48.5, over: -108, under: -112 }),
-      g(3, 'San Francisco 49ers', 'Detroit Lions', 52, { away: -140, home: 120 }, { point: -2.5, away: -110, home: -110 }, { point: 51.5, over: -110, under: -110 }),
-    ],
-    ncaaf: [
-      g(1, 'Georgia Bulldogs', 'Alabama Crimson Tide', 8, { away: 130, home: -155 }, { point: 3.5, away: -105, home: -115 }, { point: 52.5, over: -110, under: -110 }),
-      g(2, 'Ohio State Buckeyes', 'Michigan Wolverines', 30, { away: -180, home: 155 }, { point: -4.5, away: -110, home: -110 }, { point: 45.5, over: -112, under: -108 }),
-    ],
-    nba: [
-      g(1, 'Boston Celtics', 'Denver Nuggets', 5, { away: 110, home: -130 }, { point: 2.5, away: -110, home: -110 }, { point: 224.5, over: -110, under: -110 }),
-      g(2, 'Los Angeles Lakers', 'Golden State Warriors', 27, { away: 150, home: -175 }, { point: 4.5, away: -108, home: -112 }, { point: 232.5, over: -110, under: -110 }),
-    ],
-    ncaab: [
-      g(1, 'Duke Blue Devils', 'North Carolina Tar Heels', 6, { away: -120, home: 100 }, { point: -1.5, away: -110, home: -110 }, { point: 152.5, over: -110, under: -110 }),
-    ],
-    mlb: [
-      g(1, 'New York Yankees', 'Los Angeles Dodgers', 4, { away: 120, home: -140 }, { point: 1.5, away: -160, home: 135 }, { point: 8.5, over: -105, under: -115 }),
-    ],
-    nhl: [
-      g(1, 'Toronto Maple Leafs', 'Boston Bruins', 7, { away: 115, home: -135 }, { point: 1.5, away: -180, home: 150 }, { point: 6.5, over: 100, under: -120 }),
-    ],
-    epl: [
-      g(1, 'Arsenal', 'Manchester City', 20, { away: -105, home: 260 }, { point: 0.5, away: -160, home: 130 }, { point: 2.5, over: -125, under: 105 }),
-    ],
-    mls: [
-      g(1, 'LAFC', 'Inter Miami', 26, { away: 190, home: 140 }, { point: 0.5, away: 120, home: -145 }, { point: 3.5, over: 110, under: -130 }),
-    ],
-    mma: [
-      g(1, 'Islam Makhachev', 'Arman Tsarukyan', 50, { away: -145, home: 125 }, { point: null, away: null, home: null }, { point: 2.5, over: -140, under: 115 }),
-    ],
-  };
-  return sets[sport] || sets.nfl;
-}
-
-function renderSports() {
-  const v = $('#view-sports');
-  const sport = SPORTS_UI.some(s => s.id === S.sport) ? S.sport : 'nfl';
-  const meta = SPORTS_UI.find(s => s.id === sport);
-  const cache = sportsCache[sport];
-  const status = cache ? (cache.sample ? 'Sample games' : `${cache.games.length} game${cache.games.length === 1 ? '' : 's'} · live`) : 'Tap refresh to load odds';
-  v.innerHTML = `
-  <h2 class="sect">Sportsbook <small>live odds + AI reads</small></h2>
-  <div class="sportbar">${SPORTS_UI.map(s => `<button data-sport="${s.id}" class="${s.id === sport ? 'on' : ''}">${s.emoji} ${s.name}</button>`).join('')}</div>
-  <div class="sportmeta">
-    <b>${esc(meta.name)}</b>
-    <span class="muted small" id="sportStatus">${esc(status)}</span>
-    <button class="obtn" id="oddsRefresh" style="margin-left:auto; font-size:12px">↻ Refresh</button>
-  </div>
-  ${cache && cache.note ? `<p class="chip" style="margin-top:8px; color:var(--ink2)">${esc(cache.note)}</p>` : ''}
-  <div class="oddsboard" id="oddsBoard">${cache ? boardHtml(sport, cache)
-    : `<div class="card" style="text-align:center; padding:30px 20px">
-        <div style="font-size:32px">🏈</div>
-        <b>No odds loaded yet</b>
-        <p class="muted small" style="margin:6px 0 14px">Pull live moneyline, spread and total odds for ${esc(meta.name)}, then get an AI read on any matchup.</p>
-        <button class="gbtn" id="oddsFirst" style="max-width:230px; margin:0 auto">Load ${esc(meta.name)} odds</button>
-      </div>`}</div>
-  ${betsHtml()}
-  <p class="rgnote"><b>Entertainment only.</b> Odds are the market's price, not a prediction — sports betting loses money over time. 21+. Problem gambling? Call <b>1-800-GAMBLER</b>.</p>`;
-
-  $$('.sportbar button', v).forEach(b => b.onclick = () => {
-    S.sport = b.dataset.sport; save(); renderSports();
-    if (!sportsCache[b.dataset.sport]) loadOdds(b.dataset.sport);
-  });
-  const rf = $('#oddsRefresh', v); if (rf) rf.onclick = () => loadOdds(sport, true);
-  const of = $('#oddsFirst', v); if (of) of.onclick = () => loadOdds(sport, true);
-  wireBoard(v, sport);
-  wireBets(v);
-  if (!sportsAI.checked) sportsProbe();
-}
-window.renderSports = renderSports;
-
-function boardHtml(sport, cache) {
-  if (!cache.games.length) return `<div class="card" style="text-align:center; padding:26px 20px"><b>No games scheduled right now</b><p class="muted small" style="margin-top:6px">Check back closer to game day.</p></div>`;
-  return cache.games.map(g => gameCardHtml(sport, g)).join('');
-}
-function gameCardHtml(sport, g) {
-  const px = (v) => `<span class="px ${typeof v === 'number' ? (v > 0 ? 'pos' : 'neg') : ''}">${fmtAmerican(v)}</span>`;
-  const ml = g.ml || {}, sp = g.spread || {}, tot = g.total || {};
-  const pt = (s) => (s == null ? '' : (s > 0 ? `+${s}` : `${s}`));
-  const gid = esc(String(g.id));
-  return `<div class="card gamecard" data-gid="${gid}">
-    <div class="gchead">
-      <div class="gcteams">${esc(g.away)}<span class="at">@</span>${esc(g.home)}</div>
-      <div class="gctime">${esc(fmtKick(g.commence))}${g.sample ? '<br><span style="color:var(--gold)">sample</span>' : ''}</div>
-    </div>
-    <div class="mkts">
-      <div class="mkt"><div class="mkt-h">Moneyline</div>
-        <div class="mkt-c"><span class="lbl">${esc(shortTeam(g.away))}</span>${px(ml.away)}</div>
-        <div class="mkt-c"><span class="lbl">${esc(shortTeam(g.home))}</span>${px(ml.home)}</div></div>
-      <div class="mkt"><div class="mkt-h">Spread</div>
-        <div class="mkt-c"><span class="lbl">${esc(shortTeam(g.away))} ${pt(sp.point != null ? -sp.point : null)}</span>${px(sp.away)}</div>
-        <div class="mkt-c"><span class="lbl">${esc(shortTeam(g.home))} ${pt(sp.point)}</span>${px(sp.home)}</div></div>
-      <div class="mkt"><div class="mkt-h">Total</div>
-        <div class="mkt-c"><span class="lbl">O ${tot.point != null ? tot.point : ''}</span>${px(tot.over)}</div>
-        <div class="mkt-c"><span class="lbl">U ${tot.point != null ? tot.point : ''}</span>${px(tot.under)}</div></div>
-    </div>
-    <div class="gcbtns">
-      <button class="gbtn" data-analyze="${gid}" style="flex:1; min-width:150px">🤖 AI read on this game</button>
-    </div>
-    <div class="aihost" data-aihost="${gid}"></div>
-  </div>`;
-}
-function wireBoard(root, sport) {
-  $$('[data-analyze]', root).forEach(b => b.onclick = () => analyzeGame(sport, b.dataset.analyze));
-}
-
-async function loadOdds(sport, force) {
-  const ep = oddsEndpoint();
-  const status = $('#sportStatus');
-  if (sportsBusy) return; sportsBusy = true;
-  if (status) status.textContent = 'Loading odds…';
-  const board = $('#oddsBoard'); if (board && force) board.style.opacity = '.5';
-  try {
-    if (!ep) {
-      // No backend at all — run the section fully in demo mode.
-      sportsCache[sport] = { games: sampleOddsClient(sport), sample: true, note: 'Demo odds — deploy the backend (and add an odds key) for live lines.', ts: Date.now() };
-    } else {
-      const r = await fetch(`${ep}?sport=${encodeURIComponent(sport)}`, { cache: 'no-store' });
-      const j = await r.json();
-      const usedFallback = !(Array.isArray(j.games) && j.games.length);
-      sportsCache[sport] = {
-        games: usedFallback ? sampleOddsClient(sport) : j.games,
-        sample: usedFallback || !!j.sample,
-        note: j.note || (usedFallback ? 'No games returned — showing demo odds.' : ''),
-        ts: Date.now(),
-      };
-    }
-  } catch (e) {
-    sportsCache[sport] = { games: sampleOddsClient(sport), sample: true, note: 'Showing demo odds — couldn\'t reach the live feed.', ts: Date.now() };
-  } finally {
-    sportsBusy = false;
-    if (curView === 'sports') renderSports();
-  }
-}
-
-async function analyzeGame(sport, gid) {
-  const cache = sportsCache[sport]; if (!cache) return;
-  const g = cache.games.find(x => String(x.id) === String(gid)); if (!g) return;
-  const ep = sportsAiEndpoint();
-  const host = document.querySelector(`[data-aihost="${cssEsc(String(gid))}"]`); if (!host) return;
-  // No backend, or the site has no AI provider key yet: explain instead of erroring.
-  if (!ep || (sportsAI.checked && !sportsAI.ok)) {
-    host.innerHTML = `<div class="aibox"><span class="small" style="color:var(--ink2)">🔒 AI matchup reads switch on once an AI provider key is added to the site. The odds board and pick tracking work now — add a key later and this button starts giving model analysis.</span></div>`;
-    return;
-  }
-  const btn = document.querySelector(`[data-analyze="${cssEsc(String(gid))}"]`);
-  if (btn) { btn.disabled = true; btn.textContent = 'Analyzing…'; }
-  host.innerHTML = `<div class="aibox"><span class="muted small">The analyst is reading ${esc(shortTeam(g.away))} @ ${esc(shortTeam(g.home))}…</span></div>`;
-  const sportName = SPORTS_UI.find(s => s.id === sport)?.name || sport;
-  const ctrl = new AbortController();
-  const timer = setTimeout(() => ctrl.abort(), 120000);
-  try {
-    const r = await fetch(ep, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json', ...(S.aiPass ? { 'x-app-pass': S.aiPass } : {}) },
-      body: JSON.stringify({
-        sport, sportName,
-        matchup: { home: g.home, away: g.away, league: sportName, commence: g.commence },
-        odds: { ml: g.ml, spread: g.spread, total: g.total, books: g.books },
-      }),
-      signal: ctrl.signal,
-    });
-    if (r.status === 401) { host.innerHTML = ''; if (typeof askPasscode === 'function') askPasscode(); return; }
-    const j = await r.json().catch(() => ({ error: 'bad response from endpoint' }));
-    if (!r.ok || !j.ok) { host.innerHTML = `<div class="aibox"><span class="small" style="color:var(--bad)">${esc(j.error || 'AI error ' + r.status)}</span></div>`; return; }
-    host.innerHTML = analysisHtml(g, j);
-    const tb = host.querySelector('[data-track]'); if (tb) tb.onclick = () => trackBet(sport, g, j.analysis, j.model);
-  } catch (e) {
-    host.innerHTML = `<div class="aibox"><span class="small" style="color:var(--bad)">${e.name === 'AbortError' ? 'Took too long — try again' : 'Request failed — check connection'}</span></div>`;
-  } finally {
-    clearTimeout(timer);
-    if (btn) { btn.disabled = false; btn.textContent = '🤖 AI read on this game'; }
-  }
-}
-function analysisHtml(g, j) {
-  const a = j.analysis || {};
-  const conf = ['low', 'medium', 'high'].includes(a.confidence) ? a.confidence : 'low';
-  const fac = (a.keyFactors || []).map(f => `<li>${esc(f)}</li>`).join('');
-  const rsk = (a.risks || []).map(f => `<li>${esc(f)}</li>`).join('');
-  const isPass = /pass/i.test(a.market || '') || /^pass$/i.test((a.pick || '').trim());
-  return `<div class="aibox">
-    <div class="apick"><b>${esc(a.pick || '—')}</b><span class="conf ${conf}">${conf} confidence</span><span class="muted small" style="margin-left:auto">${esc(j.model || '')}</span></div>
-    ${a.edge ? `<p class="small" style="margin:8px 0 0; color:var(--ink2)">${esc(a.edge)}</p>` : ''}
-    ${a.summary ? `<p class="small" style="margin:8px 0 0">${esc(a.summary)}</p>` : ''}
-    ${fac ? `<div class="small muted" style="margin-top:9px; font-weight:700">Key factors</div><ul class="alist">${fac}</ul>` : ''}
-    ${rsk ? `<div class="small muted" style="margin-top:9px; font-weight:700">Risks</div><ul class="alist risks">${rsk}</ul>` : ''}
-    ${isPass ? '' : `<div class="rowflex" style="margin-top:11px; justify-content:flex-end"><button class="obtn gold" data-track style="font-size:12px">＋ Track this pick</button></div>`}
-  </div>`;
-}
-function trackBet(sport, g, a, model) {
-  if (!a || !a.pick) return;
-  S.sportsBets = S.sportsBets || [];
-  S.sportsBets.unshift({
-    id: 'sb' + Date.now().toString(36), sport,
-    game: `${shortTeam(g.away)} @ ${shortTeam(g.home)}`,
-    pick: a.pick, market: a.market || '', confidence: a.confidence || '',
-    model: model || '', commence: g.commence || '', at: new Date().toISOString(), status: 'pending',
-  });
-  save(); toast('Pick tracked 📌', true); renderSports();
-}
-function betsHtml() {
-  const bets = S.sportsBets || [];
-  if (!bets.length) return '';
-  return `<h2 class="sect" style="margin-top:24px">Tracked picks <small>${bets.length}</small></h2>
-    <div class="card">${bets.map(b => `<div class="betrow">
-      <div style="min-width:0"><div class="bp">${esc(b.pick)}</div><div class="bm">${esc(b.game)}${b.market ? ' · ' + esc(String(b.market).toUpperCase()) : ''}${b.confidence ? ' · ' + esc(b.confidence) : ''}${b.model ? ' · ' + esc(b.model) : ''}</div></div>
-      <button class="obtn" data-delbet="${b.id}" style="margin-left:auto; font-size:11px; padding:5px 11px">remove</button>
-    </div>`).join('')}</div>`;
-}
-function wireBets(root) {
-  $$('[data-delbet]', root).forEach(b => b.onclick = () => { S.sportsBets = (S.sportsBets || []).filter(x => x.id !== b.dataset.delbet); save(); renderSports(); });
-}
-async function sportsProbe() {
-  const ep = sportsAiEndpoint();
-  if (!ep) { sportsAI = { checked: true, ok: false }; return; }
-  try { const r = await fetch(ep, { cache: 'no-store' }); const j = await r.json(); sportsAI = { checked: true, ok: !!j.ok, passReq: !!j.passcodeRequired }; }
-  catch { sportsAI = { checked: true, ok: false }; }
-}
-
 let curView = 'home';
 function setView(name) {
   curView = name;
@@ -3608,7 +3411,7 @@ function setView(name) {
 }
 window.setView = setView;
 function refreshCurrentView() {
-  ({ home: renderHome, lab: renderLab, tickets: renderTickets, sports: renderSports, stats: renderStats, budget: renderBudget })[curView]();
+  ({ home: renderHome, lab: renderLab, tickets: renderTickets, stats: renderStats, budget: renderBudget })[curView]();
 }
 window.refreshCurrentView = refreshCurrentView;
 $$('#tabbar button').forEach(b => b.onclick = () => setView(b.dataset.v));

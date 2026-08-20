@@ -85,7 +85,7 @@ The app auto-detects which models are configured.
 Top of the model picker. Instead of asking one model, it runs two rounds:
 
 1. **Fan-out.** The strongest model from *every* configured provider — Claude Opus 5, GPT-5.6
-   Sol, Grok 4.5, Gemini 3.1 Pro — answers the same question **in parallel**, each producing
+   Sol, Grok 4.6, Gemini 3.1 Pro — answers the same question **in parallel**, each producing
    extra candidate lines plus its own read of the draw history.
 2. **Adjudication.** One model (Anthropic chairs when configured) receives every other model's
    lines *and* reasoning, resolves where their readings of the history disagree, and builds the
@@ -173,7 +173,7 @@ Cloudflare Pages → your project → **Settings → Environment variables** (Pr
 |---|---|---|
 | `ANTHROPIC_API_KEY` | Claude Fable 5 + Claude Opus 5 | console.anthropic.com → API keys |
 | `OPENAI_API_KEY` | GPT-5.6 Sol + Terra | platform.openai.com → API keys |
-| `XAI_API_KEY` | Grok 4.5 | console.x.ai |
+| `XAI_API_KEY` | Grok 4.6 | console.x.ai |
 | `GEMINI_API_KEY` | Gemini 3.1 Pro / 3.6 Flash / 3.5 Flash | aistudio.google.com → API keys |
 | `APP_USER` | Login username (defaults to `admin` if unset) | any string you choose |
 | `APP_PASSWORD` | Login password (defaults to `admin` if unset — set a real one in production) | any string you choose |

@@ -13,7 +13,7 @@ import { verifySession, sessionSecret } from '../_session.js';
 const MODELS = {
   opus:        { provider: 'anthropic', id: 'claude-opus-5',            name: 'Claude Opus 5' },
   fable:       { provider: 'anthropic', id: 'claude-fable-5',           name: 'Claude Fable 5' },
-  grok:        { provider: 'xai',       id: 'grok-4.5',                 name: 'Grok 4.5' },
+  grok:        { provider: 'xai',       id: 'grok-4.6',                 name: 'Grok 4.6' },
   sol:         { provider: 'openai',    id: 'gpt-5.6-sol',              name: 'GPT-5.6 Sol' },
   geminipro:   { provider: 'google',    id: 'gemini-3.1-pro-preview',   name: 'Gemini 3.1 Pro' },
   geminiflash: { provider: 'google',    id: 'gemini-3.6-flash',         name: 'Gemini 3.6 Flash' },

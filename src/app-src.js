@@ -440,6 +440,144 @@ function freqTable(g, window) {
   use.forEach((r, i) => r.n.forEach(n => { f[n]++; last[n] = i; }));
   return { f, last, draws: use.length, expected: use.length * M.pick / M.max };
 }
+/* Compact analysis pack for AI Pick. The model cannot recompute this from 15 draw
+   lines — we measure it here and hand it the numbers so every pick is grounded in
+   the same history the Stats tab shows. Does not change true odds; it shapes lines
+   and crowd-avoidance with real measured targets. */
+function buildAiDossier(g) {
+  const G = GAMES[g];
+  const rows = RES[g] || [];
+  const total = rows.length;
+  if (!total) return { recent: [], hot: [], cold: [], stats: null };
+
+  if (G.digits) {
+    const win = Math.min(80, total);
+    const use = rows.slice(-win);
+    const pos = Array.from({ length: G.digits }, () => new Array(10).fill(0));
+    use.forEach(r => [...String(r.n)].forEach((ch, i) => { if (i < G.digits) pos[i][+ch]++; }));
+    const byPos = pos.map((row, i) => {
+      const ranked = row.map((c, d) => ({ d, c })).sort((a, b) => b.c - a.c || a.d - b.d);
+      return {
+        pos: i + 1,
+        hot: ranked.slice(0, 3).map(x => `${x.d}(${x.c})`),
+        cold: ranked.slice(-3).reverse().map(x => `${x.d}(${x.c})`),
+      };
+    });
+    const recent = use.slice(-30).map(r => `${r.d}${r.t ? '/' + r.t : ''}: ${r.n}${r.f ? ' FB' + r.f : ''}`);
+    return {
+      recent,
+      hot: byPos.flatMap(p => p.hot.slice(0, 1).map(h => `p${p.pos}:${h}`)),
+      cold: byPos.flatMap(p => p.cold.slice(0, 1).map(c => `p${p.pos}:${c}`)),
+      stats: { draws: win, totalHistory: total, digitPos: byPos },
+    };
+  }
+
+  const M = G.matrix;
+  if (!M || M.pick < 2) {
+    return { recent: rows.slice(-20).map(r => `${r.d}: ${Array.isArray(r.n) ? r.n.join(' ') : r.n}`), hot: [], cold: [], stats: null };
+  }
+
+  const win = Math.min(120, total);
+  const use = rows.slice(-win);
+  const mid = Math.round((M.max + 1) / 2);
+  const { f, last, draws, expected } = freqTable(g, win);
+
+  const sums = [], odds = [], highs = [], spreads = [], runs = [], over31 = [];
+  const decadeHits = new Array(Math.ceil(M.max / 10)).fill(0);
+  const pairCount = new Map();
+  use.forEach(r => {
+    const n = [...r.n].sort((a, b) => a - b);
+    sums.push(n.reduce((a, b) => a + b, 0));
+    odds.push(n.filter(x => x % 2).length);
+    highs.push(n.filter(x => x > mid).length);
+    spreads.push(decadeSpread(n, M.max));
+    runs.push(maxRun(n));
+    over31.push(n.filter(x => x > 31).length);
+    n.forEach(x => { decadeHits[Math.floor((x - 1) / 10)]++; });
+    for (let i = 0; i < n.length; i++) for (let j = i + 1; j < n.length; j++) {
+      const key = n[i] + '-' + n[j];
+      pairCount.set(key, (pairCount.get(key) || 0) + 1);
+    }
+  });
+  const avg = (a) => a.length ? a.reduce((x, y) => x + y, 0) / a.length : 0;
+  const pctile = (a, p) => {
+    if (!a.length) return 0;
+    const s = [...a].sort((x, y) => x - y);
+    const i = Math.min(s.length - 1, Math.max(0, Math.round((p / 100) * (s.length - 1))));
+    return s[i];
+  };
+
+  const items = Array.from({ length: M.max }, (_, i) => {
+    const n = i + 1;
+    const gap = last[n] < 0 ? draws : draws - 1 - last[n];
+    return { n, c: f[n], gap, vs: expected ? +((f[n] - expected) / expected).toFixed(2) : 0 };
+  });
+  const hot = [...items].sort((a, b) => b.c - a.c || a.n - b.n).slice(0, 8);
+  const cold = [...items].sort((a, b) => b.gap - a.gap || a.n - b.n).slice(0, 8);
+  const under = [...items].filter(x => x.vs <= -0.25).sort((a, b) => a.vs - b.vs || a.n - b.n).slice(0, 8);
+  const over = [...items].filter(x => x.vs >= 0.25).sort((a, b) => b.vs - a.vs || a.n - b.n).slice(0, 8);
+
+  const pairs = [...pairCount.entries()].sort((a, b) => b[1] - a[1]).slice(0, 8)
+    .map(([k, c]) => ({ pair: k, c }));
+
+  let bonusHot = [], bonusCold = [];
+  if (M.bonusMax) {
+    const bf = new Array(M.bonusMax + 1).fill(0);
+    const blast = new Array(M.bonusMax + 1).fill(-1);
+    use.forEach((r, i) => { if (r.b != null) { bf[r.b]++; blast[r.b] = i; } });
+    const bItems = Array.from({ length: M.bonusMax }, (_, i) => {
+      const n = i + 1;
+      return { n, c: bf[n], gap: blast[n] < 0 ? draws : draws - 1 - blast[n] };
+    });
+    bonusHot = [...bItems].sort((a, b) => b.c - a.c).slice(0, 5);
+    bonusCold = [...bItems].sort((a, b) => b.gap - a.gap).slice(0, 5);
+  }
+
+  const decades = decadeHits.map((c, i) => ({
+    band: `${i * 10 + 1}–${Math.min(M.max, (i + 1) * 10)}`,
+    c,
+    share: draws ? +((c / (draws * M.pick)) * 100).toFixed(1) : 0,
+  }));
+
+  const recent = use.slice(-30).map(r =>
+    `${r.d}: ${[...r.n].sort((a, b) => a - b).join(' ')}${r.b != null ? ' +' + r.b : ''}`);
+  // Exact recent winning sets — models must not copy these (crowd magnet).
+  const avoidExact = use.slice(-12).map(r =>
+    [...r.n].sort((a, b) => a - b).join('-') + (r.b != null ? '+' + r.b : ''));
+
+  return {
+    recent,
+    hot: hot.map(x => x.n),
+    cold: cold.map(x => x.n),
+    stats: {
+      draws,
+      totalHistory: total,
+      expected: +expected.toFixed(2),
+      sumMean: Math.round(avg(sums)),
+      sumLo: pctile(sums, 16),
+      sumHi: pctile(sums, 84),
+      sumP10: pctile(sums, 10),
+      sumP90: pctile(sums, 90),
+      oddAvg: +avg(odds).toFixed(1),
+      evenAvg: +(M.pick - avg(odds)).toFixed(1),
+      highAvg: +avg(highs).toFixed(1),
+      lowAvg: +(M.pick - avg(highs)).toFixed(1),
+      mid,
+      spreadAvg: +avg(spreads).toFixed(1),
+      runAvg: +avg(runs).toFixed(1),
+      over31Avg: +avg(over31).toFixed(1),
+      hotDetail: hot.map(x => `${x.n}×${x.c} (gap ${x.gap})`),
+      coldDetail: cold.map(x => `${x.n} gap ${x.gap} (×${x.c})`),
+      overFreq: over.map(x => `${x.n} ${x.vs >= 0 ? '+' : ''}${Math.round(x.vs * 100)}%`),
+      underFreq: under.map(x => `${x.n} ${Math.round(x.vs * 100)}%`),
+      topPairs: pairs.map(p => `${p.pair} (${p.c}×)`),
+      decades: decades.map(d => `${d.band}: ${d.share}%`),
+      bonusHot: bonusHot.map(x => `${x.n}×${x.c}`),
+      bonusCold: bonusCold.map(x => `${x.n} gap ${x.gap}`),
+      avoidExact,
+    },
+  };
+}
 function weightedSample(weights, count) {
   const picked = new Set(); const w = weights.slice();
   while (picked.size < count) {
@@ -498,7 +636,7 @@ const STRATS = {
     },
   },
   manual: { name: 'My Numbers', ico: '✍️', truth: 'Pick your own — the Lab grades the crowd-factor as you tap.', desc: 'Tap the board to build your line and get instant analysis.', manual: true },
-  ai: { name: 'AI Pick', ico: '✨', truth: 'No AI can beat randomness. What they can do: shape a line that matches the profile of real winning draws, and keep it off the numbers everyone else plays — that part is worth real money if it hits.', desc: 'Super Intelligence puts every maker on a panel and has one adjudicate them — or pick a single model. Each explains every line it builds.', ai: true },
+  ai: { name: 'AI Pick', ico: '✨', truth: 'No AI can beat randomness. What they can do: read the full measured draw history (sums, splits, decade share, pairs, hot/cold), shape a line that matches real winning profiles, and keep it off numbers everyone else plays — that last part is worth real money if it hits.', desc: 'Sends a full history dossier to the model. Super Intelligence puts every maker on a panel and has one adjudicate them — or pick a single model. Each explains every line it builds.', ai: true },
 };
 
 /* official maker logos: Claude spark for Anthropic models, OpenAI blossom for GPT,
@@ -769,7 +907,7 @@ let AI = { checked: false, ok: false, models: {}, passReq: false };
 /* shown before the server has answered (or when it can't) so the picker is always visible */
 const AI_FALLBACK_MODELS = {
   super: { name: 'Super Intelligence' },
-  fable: { name: 'Claude Fable 5' }, opus: { name: 'Claude Opus 5' }, grok: { name: 'Grok 4.5' },
+  fable: { name: 'Claude Fable 5' }, opus: { name: 'Claude Opus 5' }, grok: { name: 'Grok 4.6' },
   sol: { name: 'GPT-5.6 Sol' }, terra: { name: 'GPT-5.6 Terra' },
   geminipro: { name: 'Gemini 3.1 Pro' }, geminiflash: { name: 'Gemini 3.6 Flash' }, gemini2flash: { name: 'Gemini 3.5 Flash' },
 };
@@ -986,18 +1124,13 @@ async function aiGenerate() {
     panel ? 'The panel is deliberating…' : name + ' is thinking…',
     panel
       ? 'Every maker answers in parallel, then one adjudicates all of them.'
-      : `${E.label} effort · matching the typical draw profile and dodging crowded numbers.`,
+      : `${E.label} effort · full draw history dossier · matching profile + dodging crowds.`,
     aiModel, true);
-  const recent = (RES[labGame] || []).slice(-15).map(r => G.digits
-    ? `${r.d}${r.t ? '/' + r.t : ''}: ${r.n}${r.f ? ' FB' + r.f : ''}`
-    : `${r.d}: ${r.n.join(' ')}${r.b != null ? ' +' + r.b : ''}`);
-  let hot = [], cold = [];
-  if (!G.digits && G.matrix && G.matrix.pick > 1) {
-    const { f, last, draws } = freqTable(labGame, 60);
-    const items = Array.from({ length: G.matrix.max }, (_, i) => ({ n: i + 1, c: f[i + 1], gap: last[i + 1] < 0 ? draws : draws - 1 - last[i + 1] }));
-    hot = [...items].sort((a, b) => b.c - a.c).slice(0, 5).map(x => x.n);
-    cold = [...items].sort((a, b) => b.gap - a.gap).slice(0, 5).map(x => x.n);
-  }
+  const dossier = buildAiDossier(labGame);
+  const recent = dossier.recent;
+  const hot = dossier.hot;
+  const cold = dossier.cold;
+  const stats = dossier.stats;
   const J = (G.jackpotSeed || G.fixedJackpot) ? jackpotOf(labGame) : null;
   // The panel runs two rounds across several providers, so it needs a longer leash
   // than a single model — the server bounds each individual call on its own side.
@@ -1012,7 +1145,7 @@ async function aiGenerate() {
       body: JSON.stringify({
         model: aiModel, game: labGame, count: Math.min(5, labCount),
         effort: aiEffortKey(), stream: true,
-        recent, hot, cold, jackpot: J ? fmtMoney(J.amt) : null,
+        recent, hot, cold, stats, jackpot: J ? fmtMoney(J.amt) : null,
       }),
       signal: ctrl.signal,
     });
